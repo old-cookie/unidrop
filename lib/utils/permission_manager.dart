@@ -26,7 +26,7 @@ class PermissionManager {
     } else {
       return true;
     }
-    return status.isGranted;
+    return status.isGranted || status.isLimited;
   }
 
   /// Requests permission to access device storage

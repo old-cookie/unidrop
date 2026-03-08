@@ -9,6 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+
   cupertino_icons: ^1.0.8
   flutter_riverpod: ^3.2.1
   http: ^1.2.2
@@ -42,6 +43,7 @@ dependencies:
   logging: ^1.3.0
   flutter_markdown_plus: ^1.0.7
   fc_native_video_thumbnail: ^0.17.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

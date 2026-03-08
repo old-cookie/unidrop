@@ -220,8 +220,9 @@ class _HomePageState extends ConsumerState<HomePage> {
       return true; // Indicate success
     } catch (e) {
       _log.severe("Error calling addFavoriteDevice", e); // Use logger
-      if (!mounted)
+      if (!mounted) {
         return false; // Check after await (though technically before context use here)
+      }
       scaffoldMessenger.showSnackBar(SnackBar(
           content: Text('Error adding favorite: $e'))); // Use stored messenger
       return false;
@@ -432,7 +433,7 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('LocalSend Plus'),
+        title: const Text('Unidrop'),
         actions: [
           IconButton(
               icon: const Icon(Icons.star),
@@ -758,8 +759,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                                         _log.severe(
                                             "Error calling removeFavoriteDevice",
                                             e); // Use logger
-                                        if (!mounted)
+                                        if (!mounted) {
                                           return; // Check after await (though technically before context use here)
+                                        }
                                         scaffoldMessenger.showSnackBar(SnackBar(
                                             content: Text(
                                                 'Error removing favorite: $e')));
@@ -811,10 +813,12 @@ class _HomePageState extends ConsumerState<HomePage> {
         final sdkInt = androidInfo.version.sdkInt;
         List<Permission> permissionsToRequest = [];
         if (sdkInt >= 33) {
-          if (fileType == FileType.image)
+          if (fileType == FileType.image) {
             permissionsToRequest.add(Permission.photos);
-          if (fileType == FileType.video)
+          }
+          if (fileType == FileType.video) {
             permissionsToRequest.add(Permission.videos);
+          }
           if (permissionsToRequest.isEmpty) {
             permissionGranted = true;
           }
@@ -842,7 +846,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           if (!mounted) return;
           var status = await Permission.photos.request();
           if (!mounted) return;
-          permissionGranted = status.isGranted;
+          permissionGranted = status.isGranted || status.isLimited;
           if (!permissionGranted) permissionTypeDenied = 'photos';
         } else {
           permissionGranted = true;
