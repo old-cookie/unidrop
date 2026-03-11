@@ -42,7 +42,7 @@ class ServerService {
     try {
       final router = Router();
       router.get('/', (Request request) {
-        return Response.ok('Hello from LocalSend Plus Server!');
+        return Response.ok('Hello from UniDrop Server!');
       });
       router.get('/info', _handleInfoRequest);
       router.post('/receive',

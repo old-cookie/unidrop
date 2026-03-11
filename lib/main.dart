@@ -75,7 +75,7 @@ class ThemeStateNotifier extends Notifier<ThemeState> {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Initialize EncryptedSharedPreferencesAsync with CustomEncryptor
-  final key = "localsendpluslocalsendpluslocal1";
+  final key = "UniDropUniDropUniDropUniDrop"; // 32 chars for AES-256
   await EncryptedSharedPreferencesAsync.initialize(key,
       encryptor: CustomEncryptor());
   // Also initialize the legacy API to potentially satisfy internal checks
@@ -104,7 +104,7 @@ class MyApp extends ConsumerWidget {
         // Settings loaded successfully
         final bool useBiometrics = settings.useBiometricAuth;
         return MaterialApp(
-          title: 'LocalSend Plus',
+          title: 'UniDrop',
           theme: themeState.lightTheme,
           darkTheme: themeState.darkTheme,
           themeMode: themeState.mode,

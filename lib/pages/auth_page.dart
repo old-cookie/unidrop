@@ -72,7 +72,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       _biometricErrorCode = '';
     });
     final securityService = ref.read(securityServiceProvider);
-    const String reason = 'Please authenticate to open LocalSend Plus';
+    const String reason = 'Please authenticate to open UniDrop';
     _log.info('Displaying biometric prompt: $reason');
     final Map<String, dynamic> result =
         await securityService.authenticateWithBiometrics(reason);
@@ -186,7 +186,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
               const Padding(
                   padding: EdgeInsets.all(32.0),
                   child: Icon(Icons.fingerprint, size: 100)),
-              Text('LocalSend Plus',
+              Text('UniDrop',
                   style: Theme.of(context).textTheme.headlineMedium),
               const SizedBox(height: 50),
               if (_statusText.isNotEmpty && !_isAuthenticating)

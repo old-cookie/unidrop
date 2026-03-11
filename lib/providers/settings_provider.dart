@@ -149,7 +149,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
       _logger.warning("Error getting device name for default alias: $e", e);
     }
     // Fallback
-    return 'LocalSend Device';
+    return 'UniDrop Device';
   }
 
   // Static method for synchronous fallback (used for initial provider state)
@@ -166,7 +166,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
     } catch (e) {
       // Ignore error in sync fallback
     }
-    return 'LocalSend Device';
+    return 'UniDrop Device';
   }
 
   /// Sets a new device alias

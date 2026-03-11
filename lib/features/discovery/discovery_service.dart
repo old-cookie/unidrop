@@ -13,7 +13,7 @@ final discoveryServiceProvider = Provider<DiscoveryService>((ref) {
   return DiscoveryService(ref);
 });
 
-/// Handles network discovery of other LocalSend+ devices using UDP multicast.
+/// Handles network discovery of other UniDrop devices using UDP multicast.
 ///
 class DiscoveryService {
   final _logger = Logger('DiscoveryService');
