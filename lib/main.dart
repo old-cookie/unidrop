@@ -12,6 +12,7 @@ import 'package:unidrop/features/security/custom_encryptor.dart';
 /// Contains the current theme mode and both light and dark theme data.
 typedef ThemeState = ({
   ThemeMode mode,
+  String brightnessValue,
   ThemeData lightTheme,
   ThemeData darkTheme
 });
@@ -32,14 +33,17 @@ final themeStateNotifierProvider =
 /// Manages the theme state and handles theme-related operations.
 /// Provides functionality to load and change themes asynchronously.
 class ThemeStateNotifier extends Notifier<ThemeState> {
-  late final EncryptedSharedPreferencesAsync _prefs;
+  EncryptedSharedPreferencesAsync? _prefs;
 
   @override
   ThemeState build() {
-    _prefs = ref.watch(sharedPreferencesProvider);
+    _prefs ??= ref.watch(sharedPreferencesProvider);
+    // Watch secondary color to trigger theme reload when it changes
+    ref.watch(secondaryColorProvider);
     Future.microtask(loadInitialTheme);
     return (
       mode: ThemeMode.system,
+      brightnessValue: 'system',
       lightTheme: themeModifier(ThemeData.light()),
       darkTheme: themeModifier(ThemeData.dark())
     );
@@ -48,10 +52,19 @@ class ThemeStateNotifier extends Notifier<ThemeState> {
   /// Loads the initial theme configuration from encrypted shared preferences.
   /// This includes theme mode and both light and dark theme data.
   Future<void> loadInitialTheme() async {
-    final mode = await _calculateThemeMode(_prefs);
-    final light = await themeLight(_prefs);
-    final dark = await themeDark(_prefs);
-    state = (mode: mode, lightTheme: light, darkTheme: dark);
+    final prefs = _prefs!;
+    final brightnessValue = await themeBrightnessPreference(prefs);
+    final mode = await _calculateThemeMode(prefs);
+    final light = await themeLight(prefs);
+    final dark = brightnessValue == 'oled'
+        ? await themeOled(prefs)
+        : await themeDark(prefs);
+    state = (
+      mode: mode,
+      brightnessValue: brightnessValue,
+      lightTheme: light,
+      darkTheme: dark,
+    );
   }
 
   /// Calculates the theme mode based on stored preferences.
@@ -64,7 +77,7 @@ class ThemeStateNotifier extends Notifier<ThemeState> {
   /// Updates the theme mode with the provided brightness value.
   /// Stores the new value in encrypted shared preferences and updates the state.
   Future<void> setThemeMode(String brightnessValue) async {
-    await _prefs.setString("brightness", brightnessValue);
+    await _prefs!.setString("brightness", brightnessValue);
     // Recalculate and update state
     await loadInitialTheme();
   }

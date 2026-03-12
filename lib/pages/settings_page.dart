@@ -26,46 +26,103 @@ class SettingsPage extends ConsumerWidget {
   Widget _buildBrightnessSegmentedButton(BuildContext context, WidgetRef ref) {
     // Watch the theme state provider synchronously
     final themeState = ref.watch(themeStateNotifierProvider);
-    final currentMode = themeState.mode;
+    final currentBrightnessString = themeState.brightnessValue;
 
-    // Convert ThemeMode enum to string for SegmentedButton
-    String currentBrightnessString = "system";
-    switch (currentMode) {
-      case ThemeMode.dark:
-        currentBrightnessString = "dark";
-        break;
-      case ThemeMode.light:
-        currentBrightnessString = "light";
-        break;
-      case ThemeMode.system:
-        currentBrightnessString = "system";
-        break;
-    }
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: SegmentedButton<String>(
+        segments: const [
+          ButtonSegment(
+              value: "dark",
+              label: Text("Dark"),
+              icon: Icon(Icons.brightness_4_rounded)),
+          ButtonSegment(
+              value: "oled",
+              label: Text("OLED"),
+              icon: Icon(Icons.dark_mode_rounded)),
+          ButtonSegment(
+              value: "system",
+              label: Text("System"),
+              icon: Icon(Icons.brightness_auto_rounded)),
+          ButtonSegment(
+              value: "light",
+              label: Text("Light"),
+              icon: Icon(Icons.brightness_high_rounded)),
+        ],
+        selected: {currentBrightnessString}, // Use the converted string
+        onSelectionChanged: (Set<String> newSelection) async {
+          selectionHaptic();
+          final newBrightness = newSelection.first;
+          // Use the renamed provider
+          await ref
+              .read(themeStateNotifierProvider.notifier)
+              .setThemeMode(newBrightness);
+        },
+      ),
+    );
+  }
 
-    return SegmentedButton<String>(
-      segments: const [
-        ButtonSegment(
-            value: "dark",
-            label: Text("Dark"),
-            icon: Icon(Icons.brightness_4_rounded)),
-        ButtonSegment(
-            value: "system",
-            label: Text("System"),
-            icon: Icon(Icons.brightness_auto_rounded)),
-        ButtonSegment(
-            value: "light",
-            label: Text("Light"),
-            icon: Icon(Icons.brightness_high_rounded)),
-      ],
-      selected: {currentBrightnessString}, // Use the converted string
-      onSelectionChanged: (Set<String> newSelection) async {
-        selectionHaptic();
-        final newBrightness = newSelection.first;
-        // Use the renamed provider
-        await ref
-            .read(themeStateNotifierProvider.notifier)
-            .setThemeMode(newBrightness);
-      },
+  /// Builds a color selector for secondary button color
+  /// [context] - BuildContext for the widget
+  /// [ref] - WidgetRef for state management
+  /// [currentColor] - Currently selected color value
+  /// Returns a Row of color selector buttons
+  Widget _buildColorSelector(
+      BuildContext context, WidgetRef ref, int currentColor) {
+    // Define 5 color options with names
+    final List<(int, String)> colorOptions = const [
+      (0xFF2196F3, 'Blue'),
+      (0xFF4CAF50, 'Green'),
+      (0xFFFF9800, 'Orange'),
+      (0xFF9C27B0, 'Purple'),
+      (0xFFE91E63, 'Pink'),
+    ];
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        spacing: 8.0,
+        children: colorOptions.map((colorTuple) {
+          final colorValue = colorTuple.$1;
+          final colorName = colorTuple.$2;
+          final isSelected = currentColor == colorValue;
+
+          return Tooltip(
+            message: colorName,
+            child: GestureDetector(
+              onTap: () {
+                selectionHaptic();
+                ref
+                    .read(settingsProvider.notifier)
+                    .setSecondaryColor(colorValue);
+              },
+              child: Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Color(colorValue),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isSelected ? Colors.white : Colors.transparent,
+                    width: 3,
+                  ),
+                  boxShadow: [
+                    if (isSelected)
+                      BoxShadow(
+                        color: Color(colorValue).withAlpha(128),
+                        blurRadius: 8,
+                        spreadRadius: 2,
+                      ),
+                  ],
+                ),
+                child: isSelected
+                    ? const Icon(Icons.check, color: Colors.white)
+                    : null,
+              ),
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 
@@ -159,6 +216,7 @@ class SettingsPage extends ConsumerWidget {
     final String? currentDestinationDir =
         ref.watch(destinationDirectoryProvider);
     final bool useBiometricAuth = ref.watch(biometricAuthProvider);
+    final int secondaryColor = ref.watch(secondaryColorProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
@@ -207,6 +265,15 @@ class SettingsPage extends ConsumerWidget {
               padding: const EdgeInsets.only(top: 8.0),
               child: _buildBrightnessSegmentedButton(
                   context, ref), // Remove FutureBuilder
+            ),
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.palette_outlined),
+            title: const Text('Secondary Color'),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: _buildColorSelector(context, ref, secondaryColor),
             ),
           ),
           const Divider(),

@@ -113,22 +113,30 @@ class _ReceivedTextDialogState extends State<ReceivedTextDialog> {
                   ),
                   TextButton(
                     child: const Text('Copy to Clipboard'),
-                    onPressed: () {
-                      Clipboard.setData(
-                              ClipboardData(text: widget.receivedText))
-                          .then((_) {
-                        // Optionally show a confirmation message
-                        ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text('Text copied to clipboard!')));
-                        Navigator.of(context).pop();
-                      }).catchError((error) {
+                    onPressed: () async {
+                      final scaffoldMessenger = ScaffoldMessenger.of(context);
+                      final navigator = Navigator.of(context);
+                      try {
+                        await Clipboard.setData(
+                          ClipboardData(text: widget.receivedText),
+                        );
+                        if (!mounted) return;
+                        scaffoldMessenger.showSnackBar(
+                          const SnackBar(
+                            content: Text('Text copied to clipboard!'),
+                          ),
+                        );
+                        navigator.pop();
+                      } catch (error) {
                         developer
                             .log('Error copying text to clipboard: $error');
-                        ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text('Error copying text.')));
-                      });
+                        if (!mounted) return;
+                        scaffoldMessenger.showSnackBar(
+                          const SnackBar(
+                            content: Text('Error copying text.'),
+                          ),
+                        );
+                      }
                     },
                   ),
                 ],

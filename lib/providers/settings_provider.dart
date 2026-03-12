@@ -16,21 +16,25 @@ const String _prefDestinationDir = 'pref_destination_dir';
 const String _prefUseBiometricAuth = 'pref_use_biometric_auth';
 const String _prefFavoriteDevices =
     'pref_favorite_devices'; // Key for favorites
+const String _prefSecondaryColor =
+    'pref_secondary_color'; // Key for secondary color
 
 /// Represents the complete state of application settings
-/// Contains device alias, destination directory, biometric auth setting and favorite devices
+/// Contains device alias, destination directory, biometric auth setting, favorite devices, and secondary color
 class SettingsState {
   final String alias;
   final String? destinationDir;
   final bool useBiometricAuth;
   final List<Map<String, String>>
       favoriteDevices; // List of {ip: '...', name: '...'}
+  final int secondaryColor; // Color as ARGB integer
 
   SettingsState({
     required this.alias,
     this.destinationDir,
     required this.useBiometricAuth,
     required this.favoriteDevices,
+    required this.secondaryColor,
   });
 
   SettingsState copyWith({
@@ -38,6 +42,7 @@ class SettingsState {
     String? destinationDir,
     bool? useBiometricAuth,
     List<Map<String, String>>? favoriteDevices,
+    int? secondaryColor,
     bool clearDestinationDir =
         false, // Flag to explicitly set destinationDir to null
   }) {
@@ -47,6 +52,7 @@ class SettingsState {
           clearDestinationDir ? null : destinationDir ?? this.destinationDir,
       useBiometricAuth: useBiometricAuth ?? this.useBiometricAuth,
       favoriteDevices: favoriteDevices ?? this.favoriteDevices,
+      secondaryColor: secondaryColor ?? this.secondaryColor,
     );
   }
 }
@@ -54,7 +60,7 @@ class SettingsState {
 /// Manages the application settings state and persistence
 /// Handles loading, saving and updating all settings
 class SettingsNotifier extends Notifier<SettingsState> {
-  late final EncryptedSharedPreferencesAsync _prefs;
+  EncryptedSharedPreferencesAsync? _prefs;
   static final DeviceInfoPlugin _deviceInfoPlugin =
       DeviceInfoPlugin(); // Instance for device info
 
@@ -72,6 +78,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
           useBiometricAuth: false,
           favoriteDevices: [],
           destinationDir: null,
+          secondaryColor: 0xFF2196F3,
         );
       },
       error: (err, stack) {
@@ -81,6 +88,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
           useBiometricAuth: false,
           favoriteDevices: [],
           destinationDir: null,
+          secondaryColor: 0xFF2196F3,
         );
       },
     );
@@ -119,11 +127,15 @@ class SettingsNotifier extends Notifier<SettingsState> {
       await prefs.setString(_prefFavoriteDevices, '[]');
     }
 
+    final secondaryColorInt =
+        await prefs.getInt(_prefSecondaryColor, defaultValue: 0xFF2196F3);
+
     return SettingsState(
       alias: alias, // Now guaranteed non-null
       destinationDir: destinationDir,
       useBiometricAuth: useBiometricAuth!, // Non-null due to defaultValue
       favoriteDevices: favoriteDevices,
+      secondaryColor: secondaryColorInt!,
     );
   }
 
@@ -173,7 +185,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
   /// [newAlias] The new alias to set. Must not be empty.
   Future<void> setAlias(String newAlias) async {
     if (newAlias.isNotEmpty) {
-      await _prefs.setString(_prefDeviceAlias, newAlias);
+      await _prefs!.setString(_prefDeviceAlias, newAlias);
       state = state.copyWith(alias: newAlias);
     }
   }
@@ -182,10 +194,10 @@ class SettingsNotifier extends Notifier<SettingsState> {
   /// [newDir] The new directory path, or null to clear
   Future<void> setDestinationDirectory(String? newDir) async {
     if (newDir == null) {
-      await _prefs.remove(_prefDestinationDir);
+      await _prefs!.remove(_prefDestinationDir);
       state = state.copyWith(clearDestinationDir: true);
     } else {
-      await _prefs.setString(_prefDestinationDir, newDir);
+      await _prefs!.setString(_prefDestinationDir, newDir);
       state = state.copyWith(destinationDir: newDir);
     }
   }
@@ -193,7 +205,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
   /// Enables or disables biometric authentication
   /// [enabled] Whether biometric auth should be enabled
   Future<void> setBiometricAuth(bool enabled) async {
-    await _prefs.setBool(_prefUseBiometricAuth, enabled);
+    await _prefs!.setBool(_prefUseBiometricAuth, enabled);
     state = state.copyWith(useBiometricAuth: enabled);
   }
 
@@ -208,7 +220,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
 
     final updatedFavorites =
         List<Map<String, String>>.from(state.favoriteDevices)..add(deviceData);
-    await _prefs.setString(_prefFavoriteDevices, jsonEncode(updatedFavorites));
+    await _prefs!.setString(_prefFavoriteDevices, jsonEncode(updatedFavorites));
     state = state.copyWith(favoriteDevices: updatedFavorites);
   }
 
@@ -224,10 +236,17 @@ class SettingsNotifier extends Notifier<SettingsState> {
         state.favoriteDevices)
       ..removeWhere(
           (fav) => fav['ip'] == deviceData['ip']); // Match only IP for removal
-    await _prefs.setString(_prefFavoriteDevices, jsonEncode(updatedFavorites));
+    await _prefs!.setString(_prefFavoriteDevices, jsonEncode(updatedFavorites));
     state = state.copyWith(favoriteDevices: updatedFavorites);
     _logger.fine(
         "Notifier state updated. New favorites list: ${state.favoriteDevices}");
+  }
+
+  /// Sets the secondary color for buttons and accents
+  /// [colorValue] The color as an ARGB integer
+  Future<void> setSecondaryColor(int colorValue) async {
+    await _prefs!.setInt(_prefSecondaryColor, colorValue);
+    state = state.copyWith(secondaryColor: colorValue);
   }
 }
 
@@ -269,6 +288,13 @@ final biometricAuthProvider = Provider<bool>((ref) {
   // Watch the main StateNotifierProvider to get live updates
   final settingsState = ref.watch(settingsProvider);
   return settingsState.useBiometricAuth;
+});
+
+/// Provides convenient access to just the secondary color
+final secondaryColorProvider = Provider<int>((ref) {
+  // Watch the main StateNotifierProvider to get live updates
+  final settingsState = ref.watch(settingsProvider);
+  return settingsState.secondaryColor;
 });
 
 /// Provides convenient access to just the list of favorite devices

@@ -231,6 +231,7 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   Future<void> _initiateSend(DeviceInfo targetDevice) async {
     if (!mounted) return;
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       _isSending = true;
     });
@@ -456,11 +457,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                 case 'scan_qr':
                   _scanQrCode();
                   break;
-                case 'ai_chat':
-                  if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                      content: Text('AI Chat is currently unavailable.')));
-                  break;
                 case 'settings':
                   if (!mounted) return;
                   Navigator.push(
@@ -485,17 +481,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                 needsDivider = true;
               }
 
-              if (!kIsWeb) {
-                if (needsDivider) items.add(const PopupMenuDivider());
-                items.add(const PopupMenuItem<String>(
-                  value: 'ai_chat',
-                  child: ListTile(
-                      leading: Icon(Icons.chat_bubble_outline),
-                      title: Text('AI Chat')),
-                ));
-                needsDivider = true;
-              }
-
               if (needsDivider) items.add(const PopupMenuDivider());
               items.add(const PopupMenuItem<String>(
                 value: 'settings',
@@ -508,142 +493,153 @@ class _HomePageState extends ConsumerState<HomePage> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Column(
-              children: [
-                if (qrData != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 16.0),
-                    child: Center(
-                      child: Container(
-                        color: Colors.white,
-                        padding: const EdgeInsets.all(8.0),
-                        child: SizedBox(
-                          width: 150,
-                          height: 150,
-                          child: PrettyQrView.data(
-                            data: qrData,
-                            decoration: const PrettyQrDecoration(
-                              shape: PrettyQrSmoothSymbol(color: Colors.black),
+      body: GestureDetector(
+        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+        behavior: HitTestBehavior.translucent,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+                children: [
+                  if (qrData != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16.0),
+                      child: Center(
+                        child: Container(
+                          color: Colors.white,
+                          padding: const EdgeInsets.all(8.0),
+                          child: SizedBox(
+                            width: 150,
+                            height: 150,
+                            child: PrettyQrView.data(
+                              data: qrData,
+                              decoration: const PrettyQrDecoration(
+                                shape:
+                                    PrettyQrSmoothSymbol(color: Colors.black),
+                              ),
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                Visibility(
-                  // Hide text field when a file is selected
-                  visible: _selectedFileName == null,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _textController,
-                          maxLines: null,
-                          decoration: const InputDecoration(
-                            labelText: 'Enter Text to Send',
-                            border: OutlineInputBorder(),
+                  Visibility(
+                    // Hide text field when a file is selected
+                    visible: _selectedFileName == null,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _textController,
+                            maxLines: null,
+                            onTapOutside: (_) =>
+                                FocusManager.instance.primaryFocus?.unfocus(),
+                            decoration: const InputDecoration(
+                              labelText: 'Enter Text to Send',
+                              border: OutlineInputBorder(),
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-            child: Align(
-                alignment: Alignment.centerLeft,
-                child:
-                    Text('Discovered Devices (${discoveredDevices.length}):')),
-          ),
-          Expanded(
-            child: discoveredDevices.isEmpty
-                ? const Center(child: Text('Searching for devices...'))
-                : ListView.builder(
-                    itemCount: discoveredDevices.length,
-                    itemBuilder: (context, index) {
-                      final device = discoveredDevices[index];
-                      return ListTile(
-                        leading: _isSending
-                            ? const CircularProgressIndicator()
-                            : const Icon(Icons.devices),
-                        title: Text(device.alias),
-                        subtitle: Text('${device.ip}:${device.port}'),
-                        onTap: _isSending ? null : () => _initiateSend(device),
-                      );
-                    },
-                  ),
-          ),
-          _buildSelectedFileThumbnail(),
-          Visibility(
-            // Hide when keyboard is visible
-            visible: MediaQuery.of(context).viewInsets.bottom == 0,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0,
-                  48.0), // Adjusted bottom padding if needed when hidden
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  if (kIsWeb)
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.attach_file),
-                      label: const Text('Attach File'),
-                      onPressed: () => _pickFile(context, FileType.any),
-                    )
-                  else
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.send),
-                      label: const Text('Send'),
-                      onPressed: () {
-                        if (!mounted) return;
-                        showModalBottomSheet(
-                          context: context,
-                          builder: (BuildContext bc) {
-                            return SafeArea(
-                              child: Wrap(
-                                children: <Widget>[
-                                  ListTile(
-                                    leading: const Icon(Icons.photo),
-                                    title: const Text('Photo'),
-                                    onTap: () async {
-                                      Navigator.pop(context);
-                                      await _pickFile(context, FileType.image);
-                                    },
-                                  ),
-                                  ListTile(
-                                    leading: const Icon(Icons.videocam),
-                                    title: const Text('Video'),
-                                    onTap: () async {
-                                      Navigator.pop(context);
-                                      await _pickFile(context, FileType.video);
-                                    },
-                                  ),
-                                  ListTile(
-                                    leading: const Icon(Icons.attach_file),
-                                    title: const Text('File'),
-                                    onTap: () async {
-                                      Navigator.pop(context);
-                                      await _pickFile(context, FileType.any);
-                                    },
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        );
-                      },
+                      ],
                     ),
+                  ),
                 ],
               ),
             ),
-          ),
-        ],
+            Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+              child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                      'Discovered Devices (${discoveredDevices.length}):')),
+            ),
+            Expanded(
+              child: discoveredDevices.isEmpty
+                  ? const Center(child: Text('Searching for devices...'))
+                  : ListView.builder(
+                      itemCount: discoveredDevices.length,
+                      itemBuilder: (context, index) {
+                        final device = discoveredDevices[index];
+                        return ListTile(
+                          leading: _isSending
+                              ? const CircularProgressIndicator()
+                              : const Icon(Icons.devices),
+                          title: Text(device.alias),
+                          subtitle: Text('${device.ip}:${device.port}'),
+                          onTap:
+                              _isSending ? null : () => _initiateSend(device),
+                        );
+                      },
+                    ),
+            ),
+            _buildSelectedFileThumbnail(),
+            Visibility(
+              // Hide when keyboard is visible
+              visible: MediaQuery.of(context).viewInsets.bottom == 0,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0,
+                    48.0), // Adjusted bottom padding if needed when hidden
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    if (kIsWeb)
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.attach_file),
+                        label: const Text('Attach File'),
+                        onPressed: () => _pickFile(context, FileType.any),
+                      )
+                    else
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.send),
+                        label: const Text('Send'),
+                        onPressed: () {
+                          if (!mounted) return;
+                          showModalBottomSheet(
+                            context: context,
+                            builder: (BuildContext bc) {
+                              return SafeArea(
+                                child: Wrap(
+                                  children: <Widget>[
+                                    ListTile(
+                                      leading: const Icon(Icons.photo),
+                                      title: const Text('Photo'),
+                                      onTap: () async {
+                                        Navigator.pop(context);
+                                        await _pickFile(
+                                            context, FileType.image);
+                                      },
+                                    ),
+                                    ListTile(
+                                      leading: const Icon(Icons.videocam),
+                                      title: const Text('Video'),
+                                      onTap: () async {
+                                        Navigator.pop(context);
+                                        await _pickFile(
+                                            context, FileType.video);
+                                      },
+                                    ),
+                                    ListTile(
+                                      leading: const Icon(Icons.attach_file),
+                                      title: const Text('File'),
+                                      onTap: () async {
+                                        Navigator.pop(context);
+                                        await _pickFile(context, FileType.any);
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -855,6 +851,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
 
     if (!mounted) return; // Check mounted *after* async permission requests
+    if (!context.mounted) return;
 
     // Removed ScaffoldMessenger capture here.
 
@@ -878,6 +875,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       FilePickerResult? result =
           await FilePicker.platform.pickFiles(type: fileType, withData: true);
       if (!mounted) return;
+      if (!context.mounted) return;
       if (result != null && result.files.isNotEmpty) {
         PlatformFile file = result.files.single;
         _log.info(
@@ -986,6 +984,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       _log.severe('Error picking file', e); // Use logger
       // Check mounted *after* the async gap and *before* using context.
       if (!mounted) return;
+      if (!context.mounted) return;
       // Capture ScaffoldMessenger *after* the await and mounted check.
       final scaffoldMessenger = ScaffoldMessenger.of(context);
       scaffoldMessenger
@@ -1024,7 +1023,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           content: Text('Cannot edit photo: No image data available.')));
       return;
     }
-    // No await before this context use
+    if (!mounted) return;
     final Uint8List? editedImageBytes = await Navigator.push<Uint8List>(
       context,
       MaterialPageRoute(builder: (context) => ImageEditor(image: imageBytes!)),
@@ -1098,9 +1097,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
 
     final File videoFile = File(videoPath);
-    // No await before this context use
-    // The Navigator.push itself uses context, but the await is for its result.
-    // The context passed to Navigator.push is captured before the await.
+    if (!mounted) return;
     final ExportConfig? exportConfig = await Navigator.push<ExportConfig?>(
       context,
       MaterialPageRoute(
