@@ -449,48 +449,61 @@ class _HomePageState extends ConsumerState<HomePage> {
             },
             tooltip: 'Refresh Devices',
           ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            tooltip: 'More Options',
-            onSelected: (String result) {
-              switch (result) {
-                case 'scan_qr':
-                  _scanQrCode();
-                  break;
-                case 'settings':
-                  if (!mounted) return;
-                  Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const SettingsPage()));
-                  break;
-              }
-            },
-            itemBuilder: (BuildContext context) {
-              final List<PopupMenuEntry<String>> items = [];
+          if (Platform.isWindows)
+            IconButton(
+              icon: const Icon(Icons.settings),
+              onPressed: () {
+                if (!mounted) return;
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const SettingsPage()));
+              },
+              tooltip: 'Settings',
+            )
+          else
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              tooltip: 'More Options',
+              onSelected: (String result) {
+                switch (result) {
+                  case 'scan_qr':
+                    _scanQrCode();
+                    break;
+                  case 'settings':
+                    if (!mounted) return;
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const SettingsPage()));
+                    break;
+                }
+              },
+              itemBuilder: (BuildContext context) {
+                final List<PopupMenuEntry<String>> items = [];
 
-              bool needsDivider = false;
+                bool needsDivider = false;
 
-              if (!kIsWeb) {
+                if (!kIsWeb) {
+                  items.add(const PopupMenuItem<String>(
+                    value: 'scan_qr',
+                    child: ListTile(
+                        leading: Icon(Icons.qr_code_scanner),
+                        title: Text('Scan QR')),
+                  ));
+                  needsDivider = true;
+                }
+
+                if (needsDivider) items.add(const PopupMenuDivider());
                 items.add(const PopupMenuItem<String>(
-                  value: 'scan_qr',
+                  value: 'settings',
                   child: ListTile(
-                      leading: Icon(Icons.qr_code_scanner),
-                      title: Text('Scan QR')),
+                      leading: Icon(Icons.settings), title: Text('Settings')),
                 ));
-                needsDivider = true;
-              }
 
-              if (needsDivider) items.add(const PopupMenuDivider());
-              items.add(const PopupMenuItem<String>(
-                value: 'settings',
-                child: ListTile(
-                    leading: Icon(Icons.settings), title: Text('Settings')),
-              ));
-
-              return items;
-            },
-          ),
+                return items;
+              },
+            ),
         ],
       ),
       body: GestureDetector(
@@ -1210,6 +1223,12 @@ class _HomePageState extends ConsumerState<HomePage> {
       scaffoldMessenger.showSnackBar(const SnackBar(
           content:
               Text('QR Code scanning via camera is not supported on web.')));
+      return;
+    }
+    if (Platform.isWindows) {
+      scaffoldMessenger.showSnackBar(const SnackBar(
+          content: Text(
+              'QR Code scanning via camera is not supported on Windows.')));
       return;
     }
     try {

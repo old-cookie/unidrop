@@ -166,25 +166,33 @@ class _ReceivedFileDialogState extends ConsumerState<ReceivedFileDialog> {
       } else {
         _logger.info(
             'Native platform detected. Keep action for ${widget.fileInfo.filename}');
-        message =
-            'File "${widget.fileInfo.filename}" kept in temporary location.'; // Default message
+        message = Platform.isWindows
+            ? 'File "${widget.fileInfo.filename}" saved to Downloads.'
+            : 'File "${widget.fileInfo.filename}" kept in temporary location.'; // Default message
         if (_mimeType != null &&
             (_mimeType!.startsWith('image/') ||
                 _mimeType!.startsWith('video/'))) {
           _logger.info(
               'Attempting to save ${widget.fileInfo.filename} to gallery...');
-          final result =
-              await ImageGallerySaverPlus.saveFile(widget.fileInfo.path);
-          _logger.info('Gallery save result: $result');
-          if (result != null && result['isSuccess'] == true) {
+          if (Platform.isWindows) {
+            // On Windows, file is already saved to Downloads folder — just keep it there.
             message =
-                '${_mimeType!.startsWith('image/') ? 'Photo' : 'Video'} "${widget.fileInfo.filename}" saved to gallery.';
-            deleteOriginal = true; // Delete original if saved to gallery
+                '${_mimeType!.startsWith('image/') ? 'Photo' : 'Video'} "${widget.fileInfo.filename}" saved to Downloads.';
+            // deleteOriginal stays false — do not delete from Downloads
           } else {
-            message =
-                'Failed to save "${widget.fileInfo.filename}" to gallery. Kept in temporary location.';
-            _logger.warning(
-                'Gallery save failed or returned unexpected result: $result');
+            final result =
+                await ImageGallerySaverPlus.saveFile(widget.fileInfo.path);
+            _logger.info('Gallery save result: $result');
+            if (result != null && result['isSuccess'] == true) {
+              message =
+                  '${_mimeType!.startsWith('image/') ? 'Photo' : 'Video'} "${widget.fileInfo.filename}" saved to gallery.';
+              deleteOriginal = true; // Delete original if saved to gallery
+            } else {
+              message =
+                  'Failed to save "${widget.fileInfo.filename}" to gallery. Kept in temporary location.';
+              _logger.warning(
+                  'Gallery save failed or returned unexpected result: $result');
+            }
           }
         } else {
           _logger.info(
