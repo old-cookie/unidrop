@@ -113,19 +113,18 @@ class _ReceivedTextDialogState extends State<ReceivedTextDialog> {
                   TextButton(
                     child: const Text('Copy to Clipboard'),
                     onPressed: () async {
-                      final navigator = Navigator.of(context);
                       try {
                         await Clipboard.setData(
                           ClipboardData(text: widget.receivedText),
                         );
-                        if (!mounted) return;
+                        if (!context.mounted) return;
                         showCopyableSnackBar(
                             context, 'Text copied to clipboard!');
-                        navigator.pop();
+                        Navigator.of(context).pop();
                       } catch (error) {
                         developer
                             .log('Error copying text to clipboard: $error');
-                        if (!mounted) return;
+                        if (!context.mounted) return;
                         showCopyableSnackBar(context, 'Error copying text.');
                       }
                     },

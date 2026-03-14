@@ -213,7 +213,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       if (!mounted) {
         // Optional: show a user-facing hint when local IP is unavailable.
       }
-          showCopyableSnackBar(context, 'Error adding favorite: $e');
+      showCopyableSnackBar(context, 'Error adding favorite: $e');
       return false;
     }
   }
@@ -232,13 +232,12 @@ class _HomePageState extends ConsumerState<HomePage> {
           (_selectedFilePath != null || _selectedFileBytes != null)) {
         // No await before this context use
         showCopyableSnackBar(context,
-          'Sending file $_selectedFileName to ${targetDevice.alias}...');
+            'Sending file $_selectedFileName to ${targetDevice.alias}...');
         await ref.read(sendServiceProvider).sendFile(
             targetDevice, _selectedFileName!,
             filePath: _selectedFilePath, fileBytes: _selectedFileBytes);
         if (!mounted) return; // Check after await
-        showCopyableSnackBar(
-          context, 'Sent $_selectedFileName successfully!');
+        showCopyableSnackBar(context, 'Sent $_selectedFileName successfully!');
         // setState is safe if mounted check is done before
         setState(() {
           _selectedFilePath = null;
@@ -265,7 +264,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           }
         } else {
           // No await before this context use
-            showCopyableSnackBar(
+          showCopyableSnackBar(
               context, 'Please enter text or select a file to send.');
           // setState is safe here as no await preceded it in this block
           setState(() {
@@ -387,7 +386,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     padding: const EdgeInsets.all(2),
-                    child: const Icon(Icons.close, color: Colors.white, size: 16),
+                    child:
+                        const Icon(Icons.close, color: Colors.white, size: 16),
                   ),
                 ),
               ),
@@ -428,7 +428,7 @@ class _HomePageState extends ConsumerState<HomePage> {
             icon: const Icon(Icons.refresh),
             onPressed: () {
               if (!mounted) return;
-                showCopyableSnackBar(
+              showCopyableSnackBar(
                   context, 'Discovery running automatically...');
             },
             tooltip: 'Refresh Devices',
@@ -608,15 +608,15 @@ class _HomePageState extends ConsumerState<HomePage> {
                                       },
                                     ),
                                     if (!Platform.isMacOS)
-                                    ListTile(
-                                      leading: const Icon(Icons.videocam),
-                                      title: const Text('Video'),
-                                      onTap: () async {
-                                        Navigator.pop(context);
-                                        await _pickFile(
-                                            context, FileType.video);
-                                      },
-                                    ),
+                                      ListTile(
+                                        leading: const Icon(Icons.videocam),
+                                        title: const Text('Video'),
+                                        onTap: () async {
+                                          Navigator.pop(context);
+                                          await _pickFile(
+                                              context, FileType.video);
+                                        },
+                                      ),
                                     ListTile(
                                       leading: const Icon(Icons.attach_file),
                                       title: const Text('File'),
@@ -740,20 +740,20 @@ class _HomePageState extends ConsumerState<HomePage> {
                                             .removeFavoriteDevice(deviceData);
                                         _log.info(
                                             "Successfully called removeFavoriteDevice for: $deviceData"); // Use logger
-                                        if (!mounted) {
+                                        if (!context.mounted) {
                                           return; // Check after await
                                         }
                                         showCopyableSnackBar(context,
-                                          'Removed $removedDeviceAlias from favorites.');
+                                            'Removed $removedDeviceAlias from favorites.');
                                       } catch (e) {
                                         _log.severe(
                                             "Error calling removeFavoriteDevice",
                                             e); // Use logger
-                                        if (!mounted) {
+                                        if (!context.mounted) {
                                           return; // Check after await (though technically before context use here)
                                         }
                                         showCopyableSnackBar(context,
-                                          'Error removing favorite: $e');
+                                            'Error removing favorite: $e');
                                       }
                                       // No need for setDialogState
                                     },
@@ -985,7 +985,8 @@ class _HomePageState extends ConsumerState<HomePage> {
       _log.warning(
           'Error: Cannot edit image on web without image bytes.'); // Use logger
       // No await before this context use
-      showCopyableSnackBar(context, 'Cannot edit photo: Image data not available.');
+      showCopyableSnackBar(
+          context, 'Cannot edit photo: Image data not available.');
       return;
     }
     if (!kIsWeb && imageBytes == null && path != null) {
@@ -999,9 +1000,11 @@ class _HomePageState extends ConsumerState<HomePage> {
         return;
       }
     }
+    if (!mounted) return;
     // No await before this context use
     if (imageBytes == null) {
-        showCopyableSnackBar(context, 'Cannot edit photo: No image data available.');
+      showCopyableSnackBar(
+          context, 'Cannot edit photo: No image data available.');
       return;
     }
     if (!mounted) return;
@@ -1030,15 +1033,16 @@ class _HomePageState extends ConsumerState<HomePage> {
     if (kIsWeb) {
       _log.warning('Video editing is not supported on the web.'); // Use logger
       // No await before this context use
-      showCopyableSnackBar(context, 'Video editing is not supported on the web.');
+      showCopyableSnackBar(
+          context, 'Video editing is not supported on the web.');
       return;
     }
 
     if (!Platform.isAndroid && !Platform.isIOS) {
       _log.warning(
           'Video editing is currently only supported on Android and iOS.');
-      showCopyableSnackBar(
-          context, 'Video editing is currently only supported on Android and iOS.');
+      showCopyableSnackBar(context,
+          'Video editing is currently only supported on Android and iOS.');
       return;
     }
 
@@ -1071,9 +1075,11 @@ class _HomePageState extends ConsumerState<HomePage> {
         return;
       }
     }
+    if (!mounted) return;
     // No await before this context use
     if (videoPath == null) {
-      showCopyableSnackBar(context, 'Cannot edit video: No video file path available.');
+      showCopyableSnackBar(
+          context, 'Cannot edit video: No video file path available.');
       setState(() {
         _isSending = false;
       }); // Reset sending state
@@ -1108,7 +1114,8 @@ class _HomePageState extends ConsumerState<HomePage> {
       _log.info('Command: ${exportConfig.command}'); // Use logger
       _log.info('Output Path: ${exportConfig.outputPath}'); // Use logger
       setState(() {});
-        showCopyableSnackBar(context, 'Video processing is currently unavailable.');
+      showCopyableSnackBar(
+          context, 'Video processing is currently unavailable.');
       setState(() {
         _selectedFilePath = null;
         _selectedFileName = null;
@@ -1198,9 +1205,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                         .read(settingsProvider.notifier)
                         .addFavoriteDevice(deviceData);
                     if (!mounted) return; // Check after await
-                    showCopyableSnackBar(
-                      currentContext,
-                      'Added ${scannedDevice.alias} to favorites.');
+                    if (!currentContext.mounted) return;
+                    showCopyableSnackBar(currentContext,
+                        'Added ${scannedDevice.alias} to favorites.');
                   },
                 ),
                 TextButton(

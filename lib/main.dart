@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -115,7 +116,10 @@ class MyApp extends ConsumerWidget {
     return settingsAsyncValue.when(
       data: (settings) {
         // Settings loaded successfully
-        final bool useBiometrics = settings.useBiometricAuth;
+        final bool biometricsSupportedOnPlatform =
+            !kIsWeb && defaultTargetPlatform != TargetPlatform.macOS;
+        final bool useBiometrics =
+            settings.useBiometricAuth && biometricsSupportedOnPlatform;
         return MaterialApp(
           title: 'UniDrop',
           theme: themeState.lightTheme,

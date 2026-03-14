@@ -1,4 +1,5 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -241,7 +242,7 @@ class SettingsPage extends ConsumerWidget {
             ),
           ], // End of conditional block for Destination Directory
           const Divider(),
-          if (!kIsWeb)
+          if (!kIsWeb && defaultTargetPlatform != TargetPlatform.macOS)
             SwitchListTile(
               secondary: const Icon(Icons.fingerprint),
               title: const Text('Use Biometric Authentication'),
