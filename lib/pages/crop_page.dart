@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:video_editor/video_editor.dart';
+import 'package:unidrop/widgets/copyable_error_snackbar.dart';
 
 /// A page for cropping videos using the video_editor package.
 /// This page provides various aspect ratio options and a visual grid for precise cropping.
@@ -23,7 +24,8 @@ class _CropPageState extends State<CropPage> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           Navigator.of(context).pop();
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Video cropping is not supported on the web.')));
+          showCopyableSnackBar(
+              context, 'Video cropping is not supported on the web.');
         }
       });
     }

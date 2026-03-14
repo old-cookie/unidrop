@@ -1,17 +1,17 @@
-package com.example.unidrop
+package com.oldcokie.unidrop
 
+import android.content.Intent
+import android.net.Uri
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
-import android.content.Intent
-import android.net.Uri
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.example.unidrop/browser"
+    private val CHANNEL = "com.oldcokie.unidrop/browser"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {

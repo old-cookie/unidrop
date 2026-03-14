@@ -6,6 +6,7 @@ import 'package:unidrop/providers/settings_provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:unidrop/main.dart';
 import 'package:logging/logging.dart';
+import 'package:unidrop/widgets/copyable_error_snackbar.dart';
 
 final _logger = Logger('SettingsPage');
 
@@ -159,12 +160,11 @@ class SettingsPage extends ConsumerWidget {
                   await ref.read(settingsProvider.notifier).setAlias(newAlias);
                   if (context.mounted) {
                     Navigator.of(context).pop();
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                        content: Text('Alias updated successfully!')));
+                    showCopyableSnackBar(
+                        context, 'Alias updated successfully!');
                   }
                 } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Alias cannot be empty.')));
+                  showCopyableSnackBar(context, 'Alias cannot be empty.');
                 }
               },
             ),
@@ -187,21 +187,18 @@ class SettingsPage extends ConsumerWidget {
             .read(settingsProvider.notifier)
             .setDestinationDirectory(selectedDirectory);
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content:
-                  Text('Destination directory set to: $selectedDirectory')));
+          showCopyableSnackBar(
+              context, 'Destination directory set to: $selectedDirectory');
         }
       } else {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Directory selection cancelled.')));
+          showCopyableSnackBar(context, 'Directory selection cancelled.');
         }
       }
     } catch (e) {
       _logger.severe('Error picking directory', e);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error selecting directory: $e')));
+        showCopyableSnackBar(context, 'Error selecting directory: $e');
       }
     }
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_link_previewer/flutter_link_previewer.dart';
 import 'dart:developer' as developer;
+import 'package:unidrop/widgets/copyable_error_snackbar.dart';
 
 /// A dialog widget that displays received text content with link preview functionality.
 /// This widget allows users to view the received text and copy it to the clipboard.
@@ -22,7 +23,7 @@ class ReceivedTextDialog extends StatefulWidget {
 /// The state for the [ReceivedTextDialog] widget.
 /// Handles the preview data state and builds the dialog UI.
 class _ReceivedTextDialogState extends State<ReceivedTextDialog> {
-  static const platform = MethodChannel('com.example.unidrop/browser');
+  static const platform = MethodChannel('com.oldcokie.unidrop/browser');
 
   String? _extractPreviewUrl(String input) {
     final match = RegExp(r'((https?:\/\/)|(www\.))[^\s]+').firstMatch(input);
@@ -41,9 +42,7 @@ class _ReceivedTextDialogState extends State<ReceivedTextDialog> {
       await platform.invokeMethod('openUrl', {'url': url});
     } on PlatformException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error opening link: ${e.message}')),
-      );
+      showCopyableSnackBar(context, 'Error opening link: ${e.message}');
     }
   }
 
@@ -114,28 +113,20 @@ class _ReceivedTextDialogState extends State<ReceivedTextDialog> {
                   TextButton(
                     child: const Text('Copy to Clipboard'),
                     onPressed: () async {
-                      final scaffoldMessenger = ScaffoldMessenger.of(context);
                       final navigator = Navigator.of(context);
                       try {
                         await Clipboard.setData(
                           ClipboardData(text: widget.receivedText),
                         );
                         if (!mounted) return;
-                        scaffoldMessenger.showSnackBar(
-                          const SnackBar(
-                            content: Text('Text copied to clipboard!'),
-                          ),
-                        );
+                        showCopyableSnackBar(
+                            context, 'Text copied to clipboard!');
                         navigator.pop();
                       } catch (error) {
                         developer
                             .log('Error copying text to clipboard: $error');
                         if (!mounted) return;
-                        scaffoldMessenger.showSnackBar(
-                          const SnackBar(
-                            content: Text('Error copying text.'),
-                          ),
-                        );
+                        showCopyableSnackBar(context, 'Error copying text.');
                       }
                     },
                   ),

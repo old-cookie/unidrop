@@ -11,6 +11,7 @@ import 'package:mime/mime.dart';
 import 'package:image/image.dart' as img;
 import 'package:fc_native_video_thumbnail/fc_native_video_thumbnail.dart';
 import 'package:logging/logging.dart';
+import 'package:unidrop/widgets/copyable_error_snackbar.dart';
 
 /// A dialog widget that displays received file information and provides options to keep or delete the file.
 /// Shows a thumbnail preview for images and videos, and handles file operations across different platforms.
@@ -111,21 +112,20 @@ class _ReceivedFileDialogState extends ConsumerState<ReceivedFileDialog> {
         await file.delete();
         _logger.info('File deleted: ${widget.fileInfo.path}');
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text('File "${widget.fileInfo.filename}" deleted.')));
+          showCopyableSnackBar(
+              context, 'File "${widget.fileInfo.filename}" deleted.');
         }
       } else {
         _logger.warning('File not found for deletion: ${widget.fileInfo.path}');
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text('File "${widget.fileInfo.filename}" not found.')));
+          showCopyableSnackBar(
+              context, 'File "${widget.fileInfo.filename}" not found.');
         }
       }
     } catch (e) {
       _logger.severe('Error deleting file ${widget.fileInfo.path}', e);
       if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error deleting file: $e')));
+        showCopyableSnackBar(context, 'Error deleting file: $e');
       }
     } finally {
       ref.read(receivedFileProvider.notifier).clearReceivedFile();
@@ -142,7 +142,6 @@ class _ReceivedFileDialogState extends ConsumerState<ReceivedFileDialog> {
   Future<void> _keepFile(BuildContext context) async {
     String message = 'File "${widget.fileInfo.filename}" kept.';
     bool deleteOriginal = false;
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
     try {
       if (kIsWeb) {
@@ -219,7 +218,7 @@ class _ReceivedFileDialogState extends ConsumerState<ReceivedFileDialog> {
       ref.read(receivedFileProvider.notifier).clearReceivedFile();
       if (context.mounted) {
         navigator.pop();
-        scaffoldMessenger.showSnackBar(SnackBar(content: Text(message)));
+        showCopyableSnackBar(context, message);
       }
     }
   }

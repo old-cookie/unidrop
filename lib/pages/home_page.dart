@@ -22,11 +22,6 @@ import 'package:unidrop/pages/video_editor_page.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:async';
 import 'package:fc_native_video_thumbnail/fc_native_video_thumbnail.dart';
-import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
-import 'package:ffmpeg_kit_flutter_new/ffmpeg_session.dart';
-import 'package:ffmpeg_kit_flutter_new/log.dart';
-import 'package:ffmpeg_kit_flutter_new/return_code.dart';
-import 'package:ffmpeg_kit_flutter_new/statistics.dart';
 import 'package:unidrop/pages/settings_page.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'package:unidrop/providers/settings_provider.dart';
@@ -34,6 +29,7 @@ import 'package:unidrop/features/server/server_provider.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:unidrop/pages/qr_scanner_page.dart';
 import 'package:logging/logging.dart'; // Import the logging package
+import 'package:unidrop/widgets/copyable_error_snackbar.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -146,8 +142,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     } catch (e) {
       _log.warning("Failed to get local IP", e); // Use logger
       if (mounted) {
-        // Optionally show a snackbar or log error to UI if needed
-        // ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not get IP address: $e')));
+        // Optional: show a user-facing hint when local IP is unavailable.
       }
     }
   }
@@ -184,15 +179,13 @@ class _HomePageState extends ConsumerState<HomePage> {
     final String name = _nameController.text.trim();
     if (!mounted) return false;
     if (ip.isEmpty || name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Please enter both IP address and name.')));
+      showCopyableSnackBar(context, 'Please enter both IP address and name.');
       return false;
     }
     final ipRegex = RegExp(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$');
     if (!ipRegex.hasMatch(ip)) {
       if (!mounted) return false;
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invalid IP address format.')));
+      showCopyableSnackBar(context, 'Invalid IP address format.');
       return false;
     }
     // Use the SettingsNotifier to add the favorite
@@ -203,8 +196,6 @@ class _HomePageState extends ConsumerState<HomePage> {
     // Rely on the check within addFavoriteDevice in the provider
 
     _log.info("Attempting to add favorite: $deviceData"); // Use logger
-    final scaffoldMessenger =
-        ScaffoldMessenger.of(context); // Store before async gap
     final focusScope = FocusScope.of(context); // Store before async gap
     try {
       await ref.read(settingsProvider.notifier).addFavoriteDevice(deviceData);
@@ -215,16 +206,14 @@ class _HomePageState extends ConsumerState<HomePage> {
       _ipController.clear();
       _nameController.clear();
       focusScope.unfocus(); // Use stored scope
-      scaffoldMessenger.showSnackBar(SnackBar(
-          content: Text('Added $name to favorites.'))); // Use stored messenger
+      showCopyableSnackBar(context, 'Added $name to favorites.');
       return true; // Indicate success
     } catch (e) {
       _log.severe("Error calling addFavoriteDevice", e); // Use logger
       if (!mounted) {
-        return false; // Check after await (though technically before context use here)
+        // Optional: show a user-facing hint when local IP is unavailable.
       }
-      scaffoldMessenger.showSnackBar(SnackBar(
-          content: Text('Error adding favorite: $e'))); // Use stored messenger
+          showCopyableSnackBar(context, 'Error adding favorite: $e');
       return false;
     }
   }
@@ -242,15 +231,14 @@ class _HomePageState extends ConsumerState<HomePage> {
       if (_selectedFileName != null &&
           (_selectedFilePath != null || _selectedFileBytes != null)) {
         // No await before this context use
-        scaffoldMessenger.showSnackBar(SnackBar(
-            content: Text(
-                'Sending file $_selectedFileName to ${targetDevice.alias}...')));
+        showCopyableSnackBar(context,
+          'Sending file $_selectedFileName to ${targetDevice.alias}...');
         await ref.read(sendServiceProvider).sendFile(
             targetDevice, _selectedFileName!,
             filePath: _selectedFilePath, fileBytes: _selectedFileBytes);
         if (!mounted) return; // Check after await
-        scaffoldMessenger.showSnackBar(
-            SnackBar(content: Text('Sent $_selectedFileName successfully!')));
+        showCopyableSnackBar(
+          context, 'Sent $_selectedFileName successfully!');
         // setState is safe if mounted check is done before
         setState(() {
           _selectedFilePath = null;
@@ -262,42 +250,23 @@ class _HomePageState extends ConsumerState<HomePage> {
         if (textToSend.isNotEmpty) {
           // No await before this context use
           scaffoldMessenger.hideCurrentSnackBar();
-          scaffoldMessenger.showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(Colors.white)),
-                  ),
-                  const SizedBox(width: 16),
-                  Text('Sending text to ${targetDevice.alias}...'),
-                ],
-              ),
-              duration: const Duration(seconds: 30),
-            ),
-          );
+          showCopyableSnackBar(
+              context, 'Sending text to ${targetDevice.alias}...');
           try {
             await ref
                 .read(sendServiceProvider)
                 .sendText(targetDevice, textToSend);
             if (!mounted) return; // Check after await
             scaffoldMessenger.hideCurrentSnackBar();
-            scaffoldMessenger.showSnackBar(const SnackBar(
-                content: Text('Text sent successfully!'),
-                backgroundColor: Colors.green));
+            showCopyableSnackBar(context, 'Text sent successfully!');
             _textController.clear(); // Safe if mounted check passed
           } catch (e) {
             errorMessage = e.toString(); // Store error message
           }
         } else {
           // No await before this context use
-          scaffoldMessenger.showSnackBar(const SnackBar(
-              content: Text('Please enter text or select a file to send.')));
+            showCopyableSnackBar(
+              context, 'Please enter text or select a file to send.');
           // setState is safe here as no await preceded it in this block
           setState(() {
             _isSending = false;
@@ -314,17 +283,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         if (errorMessage != null) {
           // Use the stored scaffoldMessenger
           scaffoldMessenger.hideCurrentSnackBar();
-          scaffoldMessenger.showSnackBar(
-            SnackBar(
-              content: Text('Error sending: $errorMessage'),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 5),
-              action: SnackBarAction(
-                  label: 'Retry',
-                  textColor: Colors.white,
-                  onPressed: () => _initiateSend(targetDevice)),
-            ),
-          );
+          showCopyableSnackBar(context, 'Error sending: $errorMessage');
         }
         setState(() {
           _isSending = false;
@@ -398,16 +357,41 @@ class _HomePageState extends ConsumerState<HomePage> {
           Text('Selected: $_selectedFileName',
               style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: 4),
-          Container(
-            height: 100,
-            width: double.infinity,
-            decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300),
-                borderRadius: BorderRadius.circular(4.0)),
-            alignment: Alignment.center,
-            child: ClipRRect(
-                borderRadius: BorderRadius.circular(4.0),
-                child: thumbnailWidget),
+          Stack(
+            children: [
+              Container(
+                height: 100,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(4.0)),
+                alignment: Alignment.center,
+                child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4.0),
+                    child: thumbnailWidget),
+              ),
+              Positioned(
+                top: 4,
+                right: 4,
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _selectedFilePath = null;
+                      _selectedFileName = null;
+                      _selectedFileBytes = null;
+                    });
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.all(2),
+                    child: const Icon(Icons.close, color: Colors.white, size: 16),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -444,8 +428,8 @@ class _HomePageState extends ConsumerState<HomePage> {
             icon: const Icon(Icons.refresh),
             onPressed: () {
               if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                  content: Text('Discovery running automatically...')));
+                showCopyableSnackBar(
+                  context, 'Discovery running automatically...');
             },
             tooltip: 'Refresh Devices',
           ),
@@ -623,6 +607,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                                             context, FileType.image);
                                       },
                                     ),
+                                    if (!Platform.isMacOS)
                                     ListTile(
                                       leading: const Icon(Icons.videocam),
                                       title: const Text('Video'),
@@ -746,9 +731,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                                     onPressed: () async {
                                       _log.info(
                                           "Attempting to remove favorite with data: $deviceData"); // Use logger
-                                      final scaffoldMessenger =
-                                          ScaffoldMessenger.of(
-                                              context); // Store before async gap
                                       final removedDeviceAlias = device.alias;
                                       // No need for mounted check here before await
                                       try {
@@ -761,9 +743,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                                         if (!mounted) {
                                           return; // Check after await
                                         }
-                                        scaffoldMessenger.showSnackBar(SnackBar(
-                                            content: Text(
-                                                'Removed $removedDeviceAlias from favorites.')));
+                                        showCopyableSnackBar(context,
+                                          'Removed $removedDeviceAlias from favorites.');
                                       } catch (e) {
                                         _log.severe(
                                             "Error calling removeFavoriteDevice",
@@ -771,9 +752,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                                         if (!mounted) {
                                           return; // Check after await (though technically before context use here)
                                         }
-                                        scaffoldMessenger.showSnackBar(SnackBar(
-                                            content: Text(
-                                                'Error removing favorite: $e')));
+                                        showCopyableSnackBar(context,
+                                          'Error removing favorite: $e');
                                       }
                                       // No need for setDialogState
                                     },
@@ -850,7 +830,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 .last;
           }
         }
-      } else {
+      } else if (Platform.isIOS) {
         if (fileType == FileType.image || fileType == FileType.video) {
           if (!mounted) return;
           var status = await Permission.photos.request();
@@ -860,6 +840,8 @@ class _HomePageState extends ConsumerState<HomePage> {
         } else {
           permissionGranted = true;
         }
+      } else {
+        permissionGranted = true;
       }
     }
 
@@ -870,9 +852,8 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     if (!permissionGranted) {
       // Use context directly here, guarded by the 'mounted' check above.
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content:
-              Text('${permissionTypeDenied ?? 'Required'} permission denied')));
+      showCopyableSnackBar(
+          context, '${permissionTypeDenied ?? 'Required'} permission denied');
       return;
     }
 
@@ -976,19 +957,13 @@ class _HomePageState extends ConsumerState<HomePage> {
         } else if (kIsWeb && filePath != null) {
           _log.warning(
               'File picking error on Web: Only path is available, but bytes are required.'); // Use logger
-          final scaffoldMessenger =
-              ScaffoldMessenger.of(context); // Store before async gap
           if (!mounted) return;
-          scaffoldMessenger.showSnackBar(const SnackBar(
-              content: Text('Failed to access selected file data.')));
+          showCopyableSnackBar(context, 'Failed to access selected file data.');
         } else {
           _log.warning(
               'File picking failed: No bytes or path available.'); // Use logger
-          final scaffoldMessenger =
-              ScaffoldMessenger.of(context); // Store before async gap
           if (!mounted) return;
-          scaffoldMessenger.showSnackBar(
-              const SnackBar(content: Text('Failed to access selected file.')));
+          showCopyableSnackBar(context, 'Failed to access selected file.');
         }
       } else {
         _log.info('File picking cancelled.'); // Use logger
@@ -999,23 +974,18 @@ class _HomePageState extends ConsumerState<HomePage> {
       if (!mounted) return;
       if (!context.mounted) return;
       // Capture ScaffoldMessenger *after* the await and mounted check.
-      final scaffoldMessenger = ScaffoldMessenger.of(context);
-      scaffoldMessenger
-          .showSnackBar(SnackBar(content: Text('Error picking file: $e')));
+      showCopyableSnackBar(context, 'Error picking file: $e');
     }
   }
 
   Future<void> _navigateToEditor(
       {Uint8List? bytes, String? path, required String fileName}) async {
-    final scaffoldMessenger =
-        ScaffoldMessenger.of(context); // Store before async gap
     Uint8List? imageBytes = bytes;
     if (kIsWeb && imageBytes == null) {
       _log.warning(
           'Error: Cannot edit image on web without image bytes.'); // Use logger
       // No await before this context use
-      scaffoldMessenger.showSnackBar(const SnackBar(
-          content: Text('Cannot edit photo: Image data not available.')));
+      showCopyableSnackBar(context, 'Cannot edit photo: Image data not available.');
       return;
     }
     if (!kIsWeb && imageBytes == null && path != null) {
@@ -1025,15 +995,13 @@ class _HomePageState extends ConsumerState<HomePage> {
       } catch (e) {
         _log.severe('Error reading image file from path', e); // Use logger
         if (!mounted) return; // Check after await
-        scaffoldMessenger.showSnackBar(
-            SnackBar(content: Text('Error reading image file: $e')));
+        showCopyableSnackBar(context, 'Error reading image file: $e');
         return;
       }
     }
     // No await before this context use
     if (imageBytes == null) {
-      scaffoldMessenger.showSnackBar(const SnackBar(
-          content: Text('Cannot edit photo: No image data available.')));
+        showCopyableSnackBar(context, 'Cannot edit photo: No image data available.');
       return;
     }
     if (!mounted) return;
@@ -1059,13 +1027,18 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   Future<void> _navigateToVideoEditor(
       {Uint8List? bytes, String? path, required String fileName}) async {
-    final scaffoldMessenger =
-        ScaffoldMessenger.of(context); // Store before async gap
     if (kIsWeb) {
       _log.warning('Video editing is not supported on the web.'); // Use logger
       // No await before this context use
-      scaffoldMessenger.showSnackBar(const SnackBar(
-          content: Text('Video editing is not supported on the web.')));
+      showCopyableSnackBar(context, 'Video editing is not supported on the web.');
+      return;
+    }
+
+    if (!Platform.isAndroid && !Platform.isIOS) {
+      _log.warning(
+          'Video editing is currently only supported on Android and iOS.');
+      showCopyableSnackBar(
+          context, 'Video editing is currently only supported on Android and iOS.');
       return;
     }
 
@@ -1090,8 +1063,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         _log.severe(
             'Error saving video bytes to temporary file', e); // Use logger
         if (!mounted) return; // Check after await
-        scaffoldMessenger.showSnackBar(
-            SnackBar(content: Text('Error preparing video for editing: $e')));
+        showCopyableSnackBar(context, 'Error preparing video for editing: $e');
         // Ensure _isSending is reset on error before returning
         setState(() {
           _isSending = false;
@@ -1101,8 +1073,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
     // No await before this context use
     if (videoPath == null) {
-      scaffoldMessenger.showSnackBar(const SnackBar(
-          content: Text('Cannot edit video: No video file path available.')));
+      showCopyableSnackBar(context, 'Cannot edit video: No video file path available.');
       setState(() {
         _isSending = false;
       }); // Reset sending state
@@ -1136,57 +1107,14 @@ class _HomePageState extends ConsumerState<HomePage> {
           'Video editing confirmed. Preparing FFmpeg execution...'); // Use logger
       _log.info('Command: ${exportConfig.command}'); // Use logger
       _log.info('Output Path: ${exportConfig.outputPath}'); // Use logger
-      // setState is safe here
-      setState(
-          () {}); // Potentially update UI to show processing state more explicitly if needed
-      scaffoldMessenger.showSnackBar(const SnackBar(
-          content: Text('Processing video... This may take a moment.')));
-      await FFmpegKit.executeAsync(
-        exportConfig.command,
-        (FFmpegSession session) async {
-          // This callback runs after FFmpeg finishes
-          final state = await session.getState();
-          final returnCode = await session.getReturnCode();
-          final failStackTrace = await session.getFailStackTrace();
-
-          if (!mounted) return; // Check inside the async callback
-
-          setState(() {
-            // Update state inside the callback
-            _isSending = false;
-          });
-
-          if (ReturnCode.isSuccess(returnCode)) {
-            _log.info('FFmpeg process completed successfully.'); // Use logger
-            final editedVideoPath = exportConfig.outputPath;
-            final editedFileName =
-                editedVideoPath.split(Platform.pathSeparator).last;
-            _setPickedFile(
-                bytes: null,
-                path: editedVideoPath,
-                name:
-                    editedFileName); // Uses context via _setPickedFile -> ScaffoldMessenger
-            // _setPickedFile already checks mounted
-          } else {
-            _log.severe(
-                'FFmpeg process failed with state $state and rc $returnCode.'); // Use logger
-            if (failStackTrace != null) {
-              _log.severe(
-                  'FFmpeg failure stack trace: $failStackTrace'); // Use logger
-            }
-            scaffoldMessenger.showSnackBar(SnackBar(
-                content: Text('Error processing video. Code: $returnCode')));
-            setState(() {
-              // Update state inside the callback
-              _selectedFilePath = null;
-              _selectedFileName = null;
-              _selectedFileBytes = null;
-            });
-          }
-        },
-        (Log log) {}, // Log callback
-        (Statistics statistics) {}, // Statistics callback
-      );
+      setState(() {});
+        showCopyableSnackBar(context, 'Video processing is currently unavailable.');
+      setState(() {
+        _selectedFilePath = null;
+        _selectedFileName = null;
+        _selectedFileBytes = null;
+        _isSending = false;
+      });
     } else {
       // This block runs if Navigator.push returned null (editing cancelled)
       _log.info('Video editing cancelled.'); // Use logger
@@ -1209,26 +1137,20 @@ class _HomePageState extends ConsumerState<HomePage> {
     });
     _log.info(
         'Selected file: $name ${bytes != null ? "(from bytes)" : "(from path)"}'); // Use logger
-    final scaffoldMessenger = ScaffoldMessenger.of(
-        context); // Store before potential async gap in caller
     if (!mounted) return; // Check before using context
-    scaffoldMessenger.showSnackBar(
-        SnackBar(content: Text('Selected: $name. Tap a device to send.')));
+    showCopyableSnackBar(context, 'Selected: $name. Tap a device to send.');
   }
 
   Future<void> _scanQrCode() async {
     if (!mounted) return;
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
     if (kIsWeb) {
-      scaffoldMessenger.showSnackBar(const SnackBar(
-          content:
-              Text('QR Code scanning via camera is not supported on web.')));
+      showCopyableSnackBar(
+          context, 'QR Code scanning via camera is not supported on web.');
       return;
     }
     if (Platform.isWindows) {
-      scaffoldMessenger.showSnackBar(const SnackBar(
-          content: Text(
-              'QR Code scanning via camera is not supported on Windows.')));
+      showCopyableSnackBar(
+          context, 'QR Code scanning via camera is not supported on Windows.');
       return;
     }
     try {
@@ -1270,17 +1192,15 @@ class _HomePageState extends ConsumerState<HomePage> {
                   onPressed: () async {
                     // Store context before async operations
                     final dialogContext = context;
-                    final scaffoldMessenger =
-                        ScaffoldMessenger.of(dialogContext);
                     Navigator.of(dialogContext).pop();
                     // Use provider to add favorite
                     await ref
                         .read(settingsProvider.notifier)
                         .addFavoriteDevice(deviceData);
                     if (!mounted) return; // Check after await
-                    scaffoldMessenger.showSnackBar(SnackBar(
-                        content: Text(
-                            'Added ${scannedDevice.alias} to favorites.')));
+                    showCopyableSnackBar(
+                      currentContext,
+                      'Added ${scannedDevice.alias} to favorites.');
                   },
                 ),
                 TextButton(
@@ -1303,14 +1223,13 @@ class _HomePageState extends ConsumerState<HomePage> {
       } catch (e) {
         _log.severe('Error processing scanned QR code', e); // Use logger
         if (!mounted) return; // Check before context use
-        scaffoldMessenger.showSnackBar(SnackBar(
-            content: Text('Invalid QR data. Scanned: "$_scanResult"')));
+        showCopyableSnackBar(
+            context, 'Invalid QR data. Scanned: "$_scanResult"');
       }
     } catch (e) {
       _log.severe('Error during QR scan or processing', e); // Use logger
       if (!mounted) return; // Check before context use
-      scaffoldMessenger
-          .showSnackBar(SnackBar(content: Text('Error scanning QR code: $e')));
+      showCopyableSnackBar(context, 'Error scanning QR code: $e');
     }
   }
 }

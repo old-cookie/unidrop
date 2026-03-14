@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:video_editor/video_editor.dart';
 import 'crop_page.dart';
+import 'package:unidrop/widgets/copyable_error_snackbar.dart';
 
 typedef ExportConfig = FFmpegVideoEditorExecute;
 
@@ -32,7 +33,8 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           Navigator.of(context).pop();
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Video editing is not supported on the web.')));
+          showCopyableSnackBar(
+              context, 'Video editing is not supported on the web.');
         }
       });
       _controller = VideoEditorController.file(
@@ -64,7 +66,7 @@ class _VideoEditorScreenState extends State<VideoEditorScreen> {
   // Display error messages to user via SnackBar
   void _showErrorSnackBar(String message) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), duration: const Duration(seconds: 2)));
+      showCopyableSnackBar(context, message);
     }
   }
 
