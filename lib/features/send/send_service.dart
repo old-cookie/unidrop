@@ -45,40 +45,72 @@ class SendService {
     final url =
         Uri.parse('http://${targetDevice.ip}:${targetDevice.port}/receive');
     final client = http.Client();
+    const timeoutDuration = Duration(seconds: 15);
+    int retryCount = 0;
+    const maxRetries = 1;
     try {
-      final request = http.MultipartRequest('POST', url);
-      request.fields['fileName'] = fileName;
-      http.MultipartFile multipartFile;
-      int bytesLength;
-      if (fileBytes != null) {
-        bytesLength = fileBytes.length;
-        multipartFile =
-            http.MultipartFile.fromBytes('file', fileBytes, filename: fileName);
-        _logger.info(
-            'Preparing to send $fileName ($bytesLength bytes) from memory...');
-      } else {
-        final file = File(filePath!);
-        bytesLength = await file.length();
-        multipartFile = await http.MultipartFile.fromPath('file', filePath,
-            filename: fileName);
-        _logger.info(
-            'Preparing to send $fileName ($bytesLength bytes) from path $filePath...');
+      int? bytesLength;
+      while (retryCount <= maxRetries) {
+        try {
+          final request = http.MultipartRequest('POST', url);
+          request.fields['fileName'] = fileName;
+          http.MultipartFile multipartFile;
+          if (fileBytes != null) {
+            bytesLength = fileBytes.length;
+            multipartFile = http.MultipartFile.fromBytes('file', fileBytes,
+                filename: fileName);
+            _logger.info(
+                'Preparing to send $fileName ($bytesLength bytes) from memory...');
+          } else {
+            final file = File(filePath!);
+            bytesLength = await file.length();
+            multipartFile = await http.MultipartFile.fromPath('file', filePath,
+                filename: fileName);
+            _logger.info(
+                'Preparing to send $fileName ($bytesLength bytes) from path $filePath...');
+          }
+
+          request.files.add(multipartFile);
+          request.fields['fileSize'] = bytesLength.toString();
+          _logger.info(
+              'Sending $fileName ($bytesLength bytes) to ${targetDevice.alias} at $url...');
+
+          final response = await client.send(request).timeout(timeoutDuration);
+          if (response.statusCode == 200) {
+            _logger.info('File sent successfully to ${targetDevice.alias}.');
+            return;
+          }
+
+          final responseBody = await response.stream.bytesToString();
+          _logger.severe(
+              'File send failed to ${targetDevice.alias}. Status code: ${response.statusCode}');
+          _logger.severe('Server error response: $responseBody');
+          throw Exception(
+              'Failed to send file: Server responded with status ${response.statusCode}');
+        } on TimeoutException {
+          final error =
+              'Connection timed out after ${timeoutDuration.inSeconds}s to ${targetDevice.ip}:${targetDevice.port}';
+          if (retryCount == maxRetries) {
+            throw Exception(_buildNetworkHelpMessage(targetDevice, error));
+          }
+          _logger.warning('Attempt ${retryCount + 1} failed: $error');
+        } on SocketException catch (e) {
+          final error = 'Socket error: ${e.message}';
+          if (retryCount == maxRetries) {
+            throw Exception(_buildNetworkHelpMessage(targetDevice, error));
+          }
+          _logger.warning('Attempt ${retryCount + 1} failed: $error');
+        }
+
+        retryCount++;
+        if (retryCount <= maxRetries) {
+          final waitDuration = Duration(milliseconds: 500 * (1 << retryCount));
+          _logger.info(
+              'Retrying file send in ${waitDuration.inMilliseconds}ms...');
+          await Future.delayed(waitDuration);
+        }
       }
-      request.files.add(multipartFile);
-      request.fields['fileSize'] = bytesLength.toString();
-      _logger.info(
-          'Sending $fileName ($bytesLength bytes) to ${targetDevice.alias} at $url...');
-      final response = await client.send(request);
-      if (response.statusCode == 200) {
-        _logger.info('File sent successfully to ${targetDevice.alias}.');
-      } else {
-        final responseBody = await response.stream.bytesToString();
-        _logger.severe(
-            'File send failed to ${targetDevice.alias}. Status code: ${response.statusCode}');
-        _logger.severe('Server error response: $responseBody');
-        throw Exception(
-            'Failed to send file: Server responded with status ${response.statusCode}');
-      }
+      throw Exception('Failed to send file after $maxRetries retries.');
     } catch (e) {
       _logger.severe('Error sending file to ${targetDevice.alias}: $e');
       throw Exception('Error sending file: $e');
@@ -87,6 +119,11 @@ class SendService {
       _logger.info(
           "HTTP Client closed for sendFile request to ${targetDevice.alias}.");
     }
+  }
+
+  String _buildNetworkHelpMessage(DeviceInfo targetDevice, String reason) {
+    return '$reason. Cannot reach ${targetDevice.alias} (${targetDevice.ip}:${targetDevice.port}). '
+        'Please ensure both devices are on the same LAN and allow UniDrop through firewall on port ${targetDevice.port}.';
   }
 
   String _truncateText(String text, [int maxLength = 50]) {

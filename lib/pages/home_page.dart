@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:unidrop/features/discovery/discovery_provider.dart';
 import 'package:unidrop/features/discovery/discovery_service.dart';
@@ -30,6 +31,25 @@ import 'package:network_info_plus/network_info_plus.dart';
 import 'package:unidrop/pages/qr_scanner_page.dart';
 import 'package:logging/logging.dart'; // Import the logging package
 import 'package:unidrop/widgets/copyable_error_snackbar.dart';
+import 'package:unidrop/utils/ip_address_utils.dart';
+
+class _DiscoveredDeviceGroup {
+  const _DiscoveredDeviceGroup({
+    required this.key,
+    required this.alias,
+    required this.port,
+    required this.devices,
+  });
+
+  final String key;
+  final String alias;
+  final int port;
+  final List<DeviceInfo> devices;
+
+  bool get hasMultipleIps => devices.length > 1;
+
+  String get subtitle => devices.map((device) => device.ip).join(', ');
+}
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -133,7 +153,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   Future<void> _fetchLocalIp() async {
     if (kIsWeb) return;
     try {
-      final ip = await NetworkInfo().getWifiIP();
+      final ip = await _resolveLocalIpAddress();
       if (mounted) {
         setState(() {
           _localIpAddress = ip;
@@ -145,6 +165,14 @@ class _HomePageState extends ConsumerState<HomePage> {
         // Optional: show a user-facing hint when local IP is unavailable.
       }
     }
+  }
+
+  Future<String?> _resolveLocalIpAddress() async {
+    final wifiIp = await NetworkInfo().getWifiIP();
+    if (IpAddressUtils.isUsableIpv4(wifiIp)) {
+      return wifiIp;
+    }
+    return IpAddressUtils.findBestLocalIpv4();
   }
 
   Future<Uint8List?> _generateVideoThumbnailData(String videoPath,
@@ -292,6 +320,90 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
+  Future<void> _manualRefreshDiscovery() async {
+    if (!mounted) return;
+    showCopyableSnackBar(context, 'Refreshing devices...');
+
+    try {
+      await _fetchLocalIp();
+      if (!mounted) return;
+      final DiscoveryService? discoveryService =
+          _discoveryService ?? ref.read(discoveryServiceProvider);
+      if (discoveryService == null) {
+        showCopyableSnackBar(context, 'Discovery service is not ready yet.');
+        return;
+      }
+      await discoveryService.stopDiscovery();
+      await discoveryService.startDiscovery();
+      if (!mounted) return;
+      showCopyableSnackBar(context, 'Device discovery refreshed.');
+    } catch (e) {
+      _log.severe('Error during manual device refresh', e);
+      if (!mounted) return;
+      showCopyableSnackBar(context, 'Refresh failed: $e');
+    }
+  }
+
+  List<_DiscoveredDeviceGroup> _groupDiscoveredDevices(
+      List<DeviceInfo> discoveredDevices) {
+    final groups = <String, List<DeviceInfo>>{};
+
+    for (final device in discoveredDevices) {
+      final key = device.deviceId?.isNotEmpty == true
+          ? 'id:${device.deviceId}'
+          : 'alias:${device.alias}:port:${device.port}';
+      groups.putIfAbsent(key, () => <DeviceInfo>[]).add(device);
+    }
+
+    final groupedDevices = groups.entries.map((entry) {
+      final devices = [...entry.value]
+        ..sort((left, right) => left.ip.compareTo(right.ip));
+      final firstDevice = devices.first;
+      return _DiscoveredDeviceGroup(
+        key: entry.key,
+        alias: firstDevice.alias,
+        port: firstDevice.port,
+        devices: devices,
+      );
+    }).toList()
+      ..sort((left, right) => left.alias.compareTo(right.alias));
+
+    return groupedDevices;
+  }
+
+  Future<void> _handleDiscoveredDeviceTap(_DiscoveredDeviceGroup group) async {
+    if (group.devices.length == 1) {
+      await _initiateSend(group.devices.first);
+      return;
+    }
+
+    final selectedDevice = await showDialog<DeviceInfo>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Choose IP for ${group.alias}'),
+        content: SizedBox(
+          width: 360,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: group.devices.length,
+            itemBuilder: (dialogContext, index) {
+              final device = group.devices[index];
+              return ListTile(
+                leading: const Icon(Icons.router),
+                title: Text(device.ip),
+                subtitle: Text('Port ${device.port}'),
+                onTap: () => Navigator.of(dialogContext).pop(device),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    if (!mounted || selectedDevice == null) return;
+    await _initiateSend(selectedDevice);
+  }
+
   Widget _buildSelectedFileThumbnail() {
     if (_selectedFileName == null) {
       return const SizedBox.shrink();
@@ -402,6 +514,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget build(BuildContext context) {
     final List<DeviceInfo> discoveredDevices =
         ref.watch(discoveredDevicesProvider);
+    final groupedDiscoveredDevices = _groupDiscoveredDevices(discoveredDevices);
     final alias = ref.watch(deviceAliasProvider);
     final serverState = ref.watch(serverStateProvider);
     String? qrData;
@@ -426,11 +539,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               tooltip: 'Show Favorites'),
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () {
-              if (!mounted) return;
-              showCopyableSnackBar(
-                  context, 'Discovery running automatically...');
-            },
+            onPressed: _manualRefreshDiscovery,
             tooltip: 'Refresh Devices',
           ),
           if (Platform.isWindows)
@@ -503,17 +612,31 @@ class _HomePageState extends ConsumerState<HomePage> {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 16.0),
                       child: Center(
-                        child: Container(
-                          color: Colors.white,
-                          padding: const EdgeInsets.all(8.0),
-                          child: SizedBox(
-                            width: 150,
-                            height: 150,
-                            child: PrettyQrView.data(
-                              data: qrData,
-                              decoration: const PrettyQrDecoration(
-                                shape:
-                                    PrettyQrSmoothSymbol(color: Colors.black),
+                        child: GestureDetector(
+                          onLongPress: () {
+                            final ipToCopy = _localIpAddress;
+                            if (ipToCopy == null || ipToCopy.isEmpty) {
+                              if (!mounted) return;
+                              showCopyableSnackBar(
+                                  context, 'No IP available to copy.');
+                              return;
+                            }
+                            Clipboard.setData(ClipboardData(text: ipToCopy));
+                            showCopyableSnackBar(
+                                context, 'Copied IP: $ipToCopy');
+                          },
+                          child: Container(
+                            color: Colors.white,
+                            padding: const EdgeInsets.all(8.0),
+                            child: SizedBox(
+                              width: 150,
+                              height: 150,
+                              child: PrettyQrView.data(
+                                data: qrData,
+                                decoration: const PrettyQrDecoration(
+                                  shape: PrettyQrSmoothSymbol(
+                                      color: Colors.black),
+                                ),
                               ),
                             ),
                           ),
@@ -549,23 +672,29 @@ class _HomePageState extends ConsumerState<HomePage> {
               child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                      'Discovered Devices (${discoveredDevices.length}):')),
+                      'Discovered Devices (${groupedDiscoveredDevices.length}):')),
             ),
             Expanded(
               child: discoveredDevices.isEmpty
                   ? const Center(child: Text('Searching for devices...'))
                   : ListView.builder(
-                      itemCount: discoveredDevices.length,
+                      itemCount: groupedDiscoveredDevices.length,
                       itemBuilder: (context, index) {
-                        final device = discoveredDevices[index];
+                        final deviceGroup = groupedDiscoveredDevices[index];
                         return ListTile(
                           leading: _isSending
                               ? const CircularProgressIndicator()
                               : const Icon(Icons.devices),
-                          title: Text(device.alias),
-                          subtitle: Text('${device.ip}:${device.port}'),
-                          onTap:
-                              _isSending ? null : () => _initiateSend(device),
+                          title: Text(deviceGroup.alias),
+                          subtitle: Text(deviceGroup.hasMultipleIps
+                              ? '${deviceGroup.subtitle} (${deviceGroup.devices.length} IPs)'
+                              : '${deviceGroup.devices.first.ip}:${deviceGroup.port}'),
+                          trailing: deviceGroup.hasMultipleIps
+                              ? const Icon(Icons.arrow_drop_down)
+                              : null,
+                          onTap: _isSending
+                              ? null
+                              : () => _handleDiscoveredDeviceTap(deviceGroup),
                         );
                       },
                     ),

@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+  show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:logging/logging.dart';
@@ -75,7 +76,8 @@ class SecurityService {
       final bool deviceSupported = await _localAuth.isDeviceSupported();
       if (!deviceSupported) {
         result['errorCode'] = errorNotAvailable;
-        result['errorMessage'] = 'Biometrics not supported on this device.';
+        result['errorMessage'] =
+            'Authentication is not supported on this device.';
         _logger.warning(result['errorMessage']);
         return result;
       }
@@ -83,23 +85,33 @@ class SecurityService {
       // Check if biometric authentication is currently available (e.g., enabled in settings).
       final bool canCheckBiometrics = await _localAuth.canCheckBiometrics;
       if (!canCheckBiometrics) {
-        result['errorCode'] = errorNotAvailable;
-        result['errorMessage'] = 'Biometrics currently unavailable.';
-        _logger.warning(result['errorMessage']);
-        return result;
+        _logger.warning(
+            'Biometrics currently unavailable. Falling back to device credentials.');
+        return _authenticateWithDeviceCredentials(localizedReason,
+            fallbackReason: 'Biometrics currently unavailable.');
       }
 
       // Get the list of biometric types enrolled by the user.
       final List<BiometricType> availableBiometrics =
           await _localAuth.getAvailableBiometrics();
       if (availableBiometrics.isEmpty) {
-        result['errorCode'] = errorNotEnrolled;
-        result['errorMessage'] = 'No biometrics enrolled on this device.';
-        _logger.warning(result['errorMessage']);
-        return result;
+        _logger.warning(
+            'No biometrics enrolled on this device. Falling back to device credentials.');
+        return _authenticateWithDeviceCredentials(localizedReason,
+            fallbackReason: 'No biometrics enrolled on this device.');
       }
 
       _logger.info("Available biometrics: $availableBiometrics");
+
+        final supportsBiometricOnly =
+          defaultTargetPlatform != TargetPlatform.windows;
+        if (!supportsBiometricOnly) {
+        _logger.info(
+          'Windows detected. Using device credentials flow because biometricOnly is not supported.');
+        return _authenticateWithDeviceCredentials(localizedReason,
+          fallbackReason:
+            'Windows platform does not support biometricOnly parameter.');
+        }
 
       // Attempt the actual biometric authentication.
       final bool didAuthenticate = await _localAuth.authenticate(
@@ -134,17 +146,24 @@ class SecurityService {
       switch (e.code) {
         case LocalAuthExceptionCode.temporaryLockout:
           result['errorCode'] = errorLockedOut;
-          break;
+          return _authenticateWithDeviceCredentials(localizedReason,
+              fallbackReason:
+                  'Biometric authentication temporarily locked. Use device credentials.');
         case LocalAuthExceptionCode.biometricLockout:
           result['errorCode'] = errorPermanentlyLockedOut;
-          break;
+          return _authenticateWithDeviceCredentials(localizedReason,
+              fallbackReason:
+                  'Biometric authentication locked. Use device credentials.');
         case LocalAuthExceptionCode.noBiometricHardware:
         case LocalAuthExceptionCode.biometricHardwareTemporarilyUnavailable:
           result['errorCode'] = errorNotAvailable;
-          break;
+          return _authenticateWithDeviceCredentials(localizedReason,
+              fallbackReason:
+                  'Biometric hardware unavailable. Use device credentials.');
         case LocalAuthExceptionCode.noBiometricsEnrolled:
           result['errorCode'] = errorNotEnrolled;
-          break;
+          return _authenticateWithDeviceCredentials(localizedReason,
+              fallbackReason: 'No biometrics enrolled. Use device credentials.');
         case LocalAuthExceptionCode.noCredentialsSet:
           result['errorCode'] = errorPasscodeNotSet;
           break;
@@ -156,6 +175,56 @@ class SecurityService {
     } catch (e) {
       // Catch any other unexpected errors.
       _logger.severe('Unexpected error during biometric authentication: $e');
+      result['success'] = false;
+      result['errorCode'] = errorUnknown;
+      result['errorMessage'] = 'An unexpected error occurred: $e';
+      return result;
+    }
+  }
+
+  Future<Map<String, dynamic>> _authenticateWithDeviceCredentials(
+    String localizedReason, {
+    required String fallbackReason,
+  }) async {
+    final result = <String, dynamic>{
+      'success': false,
+      'errorCode': errorUnknown,
+      'errorMessage': 'Authentication failed.'
+    };
+
+    try {
+      _logger.info('Fallback to device credentials. Reason: $fallbackReason');
+      final didAuthenticate = await _localAuth.authenticate(
+        localizedReason: localizedReason,
+        biometricOnly: false,
+        persistAcrossBackgrounding: true,
+      );
+
+      if (didAuthenticate) {
+        result['success'] = true;
+        result['errorCode'] = '';
+        result['errorMessage'] = 'Authentication successful.';
+      } else {
+        result['success'] = false;
+        result['errorCode'] = errorUnknown;
+        result['errorMessage'] =
+            'Authentication failed or was cancelled.';
+      }
+      return result;
+    } on LocalAuthException catch (e) {
+      _logger.severe(
+          'Device credential authentication error: ${e.code} - ${e.description}');
+      result['success'] = false;
+      result['errorCode'] = e.code.name;
+      result['errorMessage'] =
+          e.description ?? 'Device credential authentication failed.';
+      if (e.code == LocalAuthExceptionCode.noCredentialsSet) {
+        result['errorCode'] = errorPasscodeNotSet;
+      }
+      return result;
+    } catch (e) {
+      _logger.severe(
+          'Unexpected error during device credential authentication: $e');
       result['success'] = false;
       result['errorCode'] = errorUnknown;
       result['errorMessage'] = 'An unexpected error occurred: $e';

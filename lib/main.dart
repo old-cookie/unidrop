@@ -8,6 +8,7 @@ import 'package:unidrop/providers/settings_provider.dart';
 import 'package:unidrop/services/theme_service.dart';
 import 'package:encrypt_shared_preferences/provider.dart';
 import 'package:unidrop/features/security/custom_encryptor.dart';
+import 'package:logging/logging.dart';
 
 /// A record type that represents the complete theme state of the application.
 /// Contains the current theme mode and both light and dark theme data.
@@ -88,6 +89,7 @@ class ThemeStateNotifier extends Notifier<ThemeState> {
 /// Initializes necessary services and runs the app with provider scope.
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  _configureLogging();
   // Initialize EncryptedSharedPreferencesAsync with CustomEncryptor
   final key = "UniDropUniDropUniDropUniDrop"; // 32 chars for AES-256
   await EncryptedSharedPreferencesAsync.initialize(key,
@@ -100,6 +102,17 @@ void main() async {
     overrides: [sharedPreferencesProvider.overrideWithValue(prefsInstance)],
     child: const MyApp(),
   ));
+}
+
+void _configureLogging() {
+  Logger.root.level = Level.ALL;
+  Logger.root.onRecord.listen((record) {
+    final errorText = record.error == null ? '' : ' | error: ${record.error}';
+    final stackText = record.stackTrace == null ? '' : '\n${record.stackTrace}';
+    debugPrint(
+      '[${record.level.name}] ${record.loggerName}: ${record.time.toIso8601String()} ${record.message}$errorText$stackText',
+    );
+  });
 }
 
 /// The root widget of the application.

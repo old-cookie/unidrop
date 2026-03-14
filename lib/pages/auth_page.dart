@@ -207,7 +207,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                 const Column(children: [
                   CircularProgressIndicator(),
                   SizedBox(height: 16),
-                  Text('Please complete biometric authentication')
+                  Text('Please complete authentication')
                 ])
               else if (_authFailed)
                 Column(
