@@ -1,5 +1,4 @@
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,6 +24,7 @@ import 'dart:async';
 import 'package:fc_native_video_thumbnail/fc_native_video_thumbnail.dart';
 import 'package:unidrop/pages/settings_page.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
+import 'package:unidrop/providers/device_selection_provider.dart';
 import 'package:unidrop/providers/settings_provider.dart';
 import 'package:unidrop/features/server/server_provider.dart';
 import 'package:network_info_plus/network_info_plus.dart';
@@ -74,6 +74,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   ServerService? _serverService;
   String? _localIpAddress;
   String? _scanResult;
+  bool _hasShownLongPressMultiSelectHint = false;
 
   @override
   void initState() {
@@ -151,7 +152,6 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   Future<void> _fetchLocalIp() async {
-    if (kIsWeb) return;
     try {
       final ip = await _resolveLocalIpAddress();
       if (mounted) {
@@ -246,77 +246,179 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
-  Future<void> _initiateSend(DeviceInfo targetDevice) async {
-    if (!mounted) return;
+  Future<bool> _sendSelectionToDevice(
+    DeviceInfo targetDevice, {
+    required bool clearSelectedFileOnSuccess,
+    bool showProgressSnackBar = true,
+    bool showSuccessSnackBar = true,
+    bool setSendingState = true,
+  }) async {
+    if (!mounted) return false;
     FocusManager.instance.primaryFocus?.unfocus();
-    setState(() {
-      _isSending = true;
-    });
+    if (setSendingState) {
+      setState(() {
+        _isSending = true;
+      });
+    }
+
     String? errorMessage;
-    final scaffoldMessenger =
-        ScaffoldMessenger.of(context); // Store before async gap
+    var sentSuccessfully = false;
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
     try {
       if (_selectedFileName != null &&
           (_selectedFilePath != null || _selectedFileBytes != null)) {
-        // No await before this context use
-        showCopyableSnackBar(context,
-            'Sending file $_selectedFileName to ${targetDevice.alias}...');
+        if (showProgressSnackBar) {
+          showCopyableSnackBar(context,
+              'Sending file $_selectedFileName to ${targetDevice.alias}...');
+        }
         await ref.read(sendServiceProvider).sendFile(
-            targetDevice, _selectedFileName!,
-            filePath: _selectedFilePath, fileBytes: _selectedFileBytes);
-        if (!mounted) return; // Check after await
-        showCopyableSnackBar(context, 'Sent $_selectedFileName successfully!');
-        // setState is safe if mounted check is done before
-        setState(() {
-          _selectedFilePath = null;
-          _selectedFileName = null;
-          _selectedFileBytes = null;
-        });
+              targetDevice,
+              _selectedFileName!,
+              filePath: _selectedFilePath,
+              fileBytes: _selectedFileBytes,
+            );
+        if (!mounted) return false;
+        if (showSuccessSnackBar) {
+          showCopyableSnackBar(
+              context, 'Sent $_selectedFileName successfully!');
+        }
+        sentSuccessfully = true;
+
+        if (clearSelectedFileOnSuccess) {
+          setState(() {
+            _selectedFilePath = null;
+            _selectedFileName = null;
+            _selectedFileBytes = null;
+          });
+          ref.read(deviceSelectionProvider.notifier).clearSelection();
+          _hasShownLongPressMultiSelectHint = false;
+        }
       } else {
         final textToSend = _textController.text.trim();
         if (textToSend.isNotEmpty) {
-          // No await before this context use
-          scaffoldMessenger.hideCurrentSnackBar();
-          showCopyableSnackBar(
-              context, 'Sending text to ${targetDevice.alias}...');
+          if (showProgressSnackBar) {
+            scaffoldMessenger.hideCurrentSnackBar();
+            showCopyableSnackBar(
+                context, 'Sending text to ${targetDevice.alias}...');
+          }
           try {
             await ref
                 .read(sendServiceProvider)
                 .sendText(targetDevice, textToSend);
-            if (!mounted) return; // Check after await
-            scaffoldMessenger.hideCurrentSnackBar();
-            showCopyableSnackBar(context, 'Text sent successfully!');
-            _textController.clear(); // Safe if mounted check passed
+            if (!mounted) return false;
+            if (showSuccessSnackBar) {
+              scaffoldMessenger.hideCurrentSnackBar();
+              showCopyableSnackBar(context, 'Text sent successfully!');
+            }
+            _textController.clear();
+            sentSuccessfully = true;
           } catch (e) {
-            errorMessage = e.toString(); // Store error message
+            errorMessage = e.toString();
           }
         } else {
-          // No await before this context use
           showCopyableSnackBar(
               context, 'Please enter text or select a file to send.');
-          // setState is safe here as no await preceded it in this block
-          setState(() {
-            _isSending = false;
-          });
-          return;
+          return false;
         }
       }
     } catch (e) {
-      errorMessage ??= e
-          .toString(); // Ensure errorMessage is set if it wasn't from inner catch
+      errorMessage ??= e.toString();
     } finally {
-      // Check mounted *inside* finally before using context or setState, but DO NOT return.
       if (mounted) {
         if (errorMessage != null) {
-          // Use the stored scaffoldMessenger
           scaffoldMessenger.hideCurrentSnackBar();
           showCopyableSnackBar(context, 'Error sending: $errorMessage');
         }
-        setState(() {
-          _isSending = false;
-        });
+        if (setSendingState) {
+          setState(() {
+            _isSending = false;
+          });
+        }
       }
-      // If not mounted, the finally block completes without doing unsafe operations.
+    }
+    return sentSuccessfully;
+  }
+
+  Future<void> _initiateSend(DeviceInfo targetDevice) async {
+    await _sendSelectionToDevice(
+      targetDevice,
+      clearSelectedFileOnSuccess: true,
+    );
+  }
+
+  Future<void> _handleBatchSend(
+      List<_DiscoveredDeviceGroup> groupedDiscoveredDevices) async {
+    if (!mounted || _isSending) return;
+    if (_selectedFileName == null ||
+        (_selectedFilePath == null && _selectedFileBytes == null)) {
+      showCopyableSnackBar(context, 'Please select a file first.');
+      return;
+    }
+
+    final selectedKeys = ref.read(deviceSelectionProvider);
+    if (selectedKeys.isEmpty) {
+      showCopyableSnackBar(context, 'Long press devices to select for batch.');
+      return;
+    }
+
+    final targets = <DeviceInfo>[];
+    for (final group in groupedDiscoveredDevices) {
+      for (final device in group.devices) {
+        if (selectedKeys.contains(_selectionKeyForDevice(device))) {
+          targets.add(device);
+        }
+      }
+    }
+
+    if (targets.isEmpty) {
+      ref.read(deviceSelectionProvider.notifier).clearSelection();
+      showCopyableSnackBar(
+          context, 'Selected devices are no longer available.');
+      return;
+    }
+
+    final fileName = _selectedFileName;
+    showCopyableSnackBar(
+        context, 'Sending $fileName to ${targets.length} devices...');
+
+    setState(() {
+      _isSending = true;
+    });
+
+    var successCount = 0;
+    var failedCount = 0;
+    for (final target in targets) {
+      final success = await _sendSelectionToDevice(
+        target,
+        clearSelectedFileOnSuccess: false,
+        showProgressSnackBar: false,
+        showSuccessSnackBar: false,
+        setSendingState: false,
+      );
+      if (!mounted) return;
+      if (success) {
+        successCount++;
+      } else {
+        failedCount++;
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _selectedFilePath = null;
+      _selectedFileName = null;
+      _selectedFileBytes = null;
+      _isSending = false;
+    });
+    ref.read(deviceSelectionProvider.notifier).clearSelection();
+    _hasShownLongPressMultiSelectHint = false;
+
+    if (failedCount == 0) {
+      showCopyableSnackBar(
+          context, 'Sent to $successCount devices successfully!');
+    } else {
+      showCopyableSnackBar(
+          context, 'Batch done. Success: $successCount, Failed: $failedCount.');
     }
   }
 
@@ -371,16 +473,40 @@ class _HomePageState extends ConsumerState<HomePage> {
     return groupedDevices;
   }
 
-  Future<void> _handleDiscoveredDeviceTap(_DiscoveredDeviceGroup group) async {
-    if (group.devices.length == 1) {
-      await _initiateSend(group.devices.first);
-      return;
-    }
+  String _selectionKeyForDevice(DeviceInfo device) {
+    final normalizedDeviceId = device.deviceId?.isNotEmpty == true
+        ? device.deviceId
+        : '${device.alias}:${device.port}';
+    return 'device:$normalizedDeviceId:ip:${device.ip}:port:${device.port}';
+  }
 
-    final selectedDevice = await showDialog<DeviceInfo>(
+  bool _groupContainsSelectedDevice(
+      _DiscoveredDeviceGroup group, Set<String> selectedKeys) {
+    for (final device in group.devices) {
+      if (selectedKeys.contains(_selectionKeyForDevice(device))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  int _selectedDeviceCountInGroup(
+      _DiscoveredDeviceGroup group, Set<String> selectedKeys) {
+    var count = 0;
+    for (final device in group.devices) {
+      if (selectedKeys.contains(_selectionKeyForDevice(device))) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  Future<DeviceInfo?> _pickDeviceFromGroup(_DiscoveredDeviceGroup group,
+      {required String title}) async {
+    return showDialog<DeviceInfo>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('Choose IP for ${group.alias}'),
+        title: Text(title),
         content: SizedBox(
           width: 360,
           child: ListView.builder(
@@ -398,6 +524,18 @@ class _HomePageState extends ConsumerState<HomePage> {
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _handleDiscoveredDeviceTap(_DiscoveredDeviceGroup group) async {
+    if (group.devices.length == 1) {
+      await _initiateSend(group.devices.first);
+      return;
+    }
+
+    final selectedDevice = await _pickDeviceFromGroup(
+      group,
+      title: 'Choose IP for ${group.alias}',
     );
 
     if (!mounted || selectedDevice == null) return;
@@ -424,14 +562,14 @@ class _HomePageState extends ConsumerState<HomePage> {
     if (isImage) {
       if (_selectedFileBytes != null) {
         thumbnailWidget = Image.memory(_selectedFileBytes!, fit: BoxFit.cover);
-      } else if (!kIsWeb && _selectedFilePath != null) {
+      } else if (_selectedFilePath != null) {
         thumbnailWidget =
             Image.file(File(_selectedFilePath!), fit: BoxFit.cover);
       } else {
         thumbnailWidget = const Icon(Icons.image_not_supported, size: 50);
       }
     } else if (isVideo) {
-      if (!kIsWeb && _selectedFilePath != null) {
+      if (_selectedFilePath != null) {
         thumbnailWidget = FutureBuilder<Uint8List?>(
           future: _generateVideoThumbnailData(
             _selectedFilePath!,
@@ -491,6 +629,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                       _selectedFileName = null;
                       _selectedFileBytes = null;
                     });
+                    ref.read(deviceSelectionProvider.notifier).clearSelection();
+                    _hasShownLongPressMultiSelectHint = false;
                   },
                   child: Container(
                     decoration: BoxDecoration(
@@ -515,6 +655,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     final List<DeviceInfo> discoveredDevices =
         ref.watch(discoveredDevicesProvider);
     final groupedDiscoveredDevices = _groupDiscoveredDevices(discoveredDevices);
+    final selectedDeviceKeys = ref.watch(deviceSelectionProvider);
     final alias = ref.watch(deviceAliasProvider);
     final serverState = ref.watch(serverStateProvider);
     String? qrData;
@@ -577,15 +718,13 @@ class _HomePageState extends ConsumerState<HomePage> {
 
                 bool needsDivider = false;
 
-                if (!kIsWeb) {
-                  items.add(const PopupMenuItem<String>(
-                    value: 'scan_qr',
-                    child: ListTile(
-                        leading: Icon(Icons.qr_code_scanner),
-                        title: Text('Scan QR')),
-                  ));
-                  needsDivider = true;
-                }
+                items.add(const PopupMenuItem<String>(
+                  value: 'scan_qr',
+                  child: ListTile(
+                      leading: Icon(Icons.qr_code_scanner),
+                      title: Text('Scan QR')),
+                ));
+                needsDivider = true;
 
                 if (needsDivider) items.add(const PopupMenuDivider());
                 items.add(const PopupMenuItem<String>(
@@ -634,8 +773,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                               child: PrettyQrView.data(
                                 data: qrData,
                                 decoration: const PrettyQrDecoration(
-                                  shape: PrettyQrSmoothSymbol(
-                                      color: Colors.black),
+                                  shape:
+                                      PrettyQrSmoothSymbol(color: Colors.black),
                                 ),
                               ),
                             ),
@@ -681,20 +820,75 @@ class _HomePageState extends ConsumerState<HomePage> {
                       itemCount: groupedDiscoveredDevices.length,
                       itemBuilder: (context, index) {
                         final deviceGroup = groupedDiscoveredDevices[index];
+                        final isSelected = _groupContainsSelectedDevice(
+                            deviceGroup, selectedDeviceKeys);
+                        final selectedCount = _selectedDeviceCountInGroup(
+                            deviceGroup, selectedDeviceKeys);
                         return ListTile(
                           leading: _isSending
                               ? const CircularProgressIndicator()
                               : const Icon(Icons.devices),
+                          selected: isSelected,
                           title: Text(deviceGroup.alias),
                           subtitle: Text(deviceGroup.hasMultipleIps
                               ? '${deviceGroup.subtitle} (${deviceGroup.devices.length} IPs)'
                               : '${deviceGroup.devices.first.ip}:${deviceGroup.port}'),
-                          trailing: deviceGroup.hasMultipleIps
-                              ? const Icon(Icons.arrow_drop_down)
+                          trailing: (isSelected || deviceGroup.hasMultipleIps)
+                              ? Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (selectedCount > 0) ...[
+                                      const Icon(Icons.check_circle,
+                                          color: Colors.green),
+                                      const SizedBox(width: 4),
+                                      Text('$selectedCount'),
+                                    ],
+                                    if (deviceGroup.hasMultipleIps)
+                                      const Icon(Icons.arrow_drop_down),
+                                  ],
+                                )
                               : null,
                           onTap: _isSending
                               ? null
                               : () => _handleDiscoveredDeviceTap(deviceGroup),
+                          onLongPress: (_isSending || _selectedFileName == null)
+                              ? null
+                              : () async {
+                                  DeviceInfo? target;
+                                  if (deviceGroup.devices.length == 1) {
+                                    target = deviceGroup.devices.first;
+                                  } else {
+                                    target = await _pickDeviceFromGroup(
+                                      deviceGroup,
+                                      title:
+                                          'Choose IP to select for ${deviceGroup.alias}',
+                                    );
+                                  }
+                                  if (!mounted ||
+                                      !this.context.mounted ||
+                                      target == null) {
+                                    return;
+                                  }
+                                  final key = _selectionKeyForDevice(target);
+                                  final notifier = ref
+                                      .read(deviceSelectionProvider.notifier);
+                                  notifier.toggleSelection(key);
+
+                                  final isNowSelected = ref
+                                      .read(deviceSelectionProvider)
+                                      .contains(key);
+                                  showCopyableSnackBar(
+                                    this.context,
+                                    isNowSelected
+                                        ? 'Selected ${target.alias} (${target.ip}) for batch.'
+                                        : 'Removed ${target.alias} (${target.ip}) from batch.',
+                                  );
+                                  if (!_hasShownLongPressMultiSelectHint) {
+                                    _hasShownLongPressMultiSelectHint = true;
+                                    showCopyableSnackBar(this.context,
+                                        'Device selected. Tap "Send to N" for batch send.');
+                                  }
+                                },
                         );
                       },
                     ),
@@ -709,57 +903,58 @@ class _HomePageState extends ConsumerState<HomePage> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    if (kIsWeb)
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.attach_file),
-                        label: const Text('Attach File'),
-                        onPressed: () => _pickFile(context, FileType.any),
-                      )
-                    else
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.send),
-                        label: const Text('Send'),
-                        onPressed: () {
-                          if (!mounted) return;
-                          showModalBottomSheet(
-                            context: context,
-                            builder: (BuildContext bc) {
-                              return SafeArea(
-                                child: Wrap(
-                                  children: <Widget>[
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.send),
+                      label: const Text('Send'),
+                      onPressed: () {
+                        if (!mounted) return;
+                        showModalBottomSheet(
+                          context: context,
+                          builder: (BuildContext bc) {
+                            return SafeArea(
+                              child: Wrap(
+                                children: <Widget>[
+                                  ListTile(
+                                    leading: const Icon(Icons.photo),
+                                    title: const Text('Photo'),
+                                    onTap: () async {
+                                      Navigator.pop(context);
+                                      await _pickFile(context, FileType.image);
+                                    },
+                                  ),
+                                  if (!Platform.isMacOS)
                                     ListTile(
-                                      leading: const Icon(Icons.photo),
-                                      title: const Text('Photo'),
+                                      leading: const Icon(Icons.videocam),
+                                      title: const Text('Video'),
                                       onTap: () async {
                                         Navigator.pop(context);
                                         await _pickFile(
-                                            context, FileType.image);
+                                            context, FileType.video);
                                       },
                                     ),
-                                    if (!Platform.isMacOS)
-                                      ListTile(
-                                        leading: const Icon(Icons.videocam),
-                                        title: const Text('Video'),
-                                        onTap: () async {
-                                          Navigator.pop(context);
-                                          await _pickFile(
-                                              context, FileType.video);
-                                        },
-                                      ),
-                                    ListTile(
-                                      leading: const Icon(Icons.attach_file),
-                                      title: const Text('File'),
-                                      onTap: () async {
-                                        Navigator.pop(context);
-                                        await _pickFile(context, FileType.any);
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          );
-                        },
+                                  ListTile(
+                                    leading: const Icon(Icons.attach_file),
+                                    title: const Text('File'),
+                                    onTap: () async {
+                                      Navigator.pop(context);
+                                      await _pickFile(context, FileType.any);
+                                    },
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                    if (selectedDeviceKeys.isNotEmpty &&
+                        _selectedFileName != null)
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.send_to_mobile),
+                        label: Text('Send to ${selectedDeviceKeys.length}'),
+                        onPressed: _isSending
+                            ? null
+                            : () => _handleBatchSend(groupedDiscoveredDevices),
                       ),
                   ],
                 ),
@@ -921,57 +1116,52 @@ class _HomePageState extends ConsumerState<HomePage> {
   Future<void> _pickFile(BuildContext context, FileType fileType) async {
     bool permissionGranted = false;
     String? permissionTypeDenied;
-    if (kIsWeb) {
-      permissionGranted = true;
-    } else {
-      if (Platform.isAndroid) {
-        if (!mounted) return;
-        final androidInfo = await DeviceInfoPlugin().androidInfo;
-        if (!mounted) return;
-        final sdkInt = androidInfo.version.sdkInt;
-        List<Permission> permissionsToRequest = [];
-        if (sdkInt >= 33) {
-          if (fileType == FileType.image) {
-            permissionsToRequest.add(Permission.photos);
-          }
-          if (fileType == FileType.video) {
-            permissionsToRequest.add(Permission.videos);
-          }
-          if (permissionsToRequest.isEmpty) {
-            permissionGranted = true;
-          }
-        } else {
-          permissionsToRequest.add(Permission.storage);
+    if (Platform.isAndroid) {
+      if (!mounted) return;
+      final androidInfo = await DeviceInfoPlugin().androidInfo;
+      if (!mounted) return;
+      final sdkInt = androidInfo.version.sdkInt;
+      List<Permission> permissionsToRequest = [];
+      if (sdkInt >= 33) {
+        if (fileType == FileType.image) {
+          permissionsToRequest.add(Permission.photos);
         }
-        if (permissionsToRequest.isNotEmpty) {
-          if (!mounted) return;
-          Map<Permission, PermissionStatus> statuses =
-              await permissionsToRequest.request();
-          if (!mounted) return;
-          permissionGranted =
-              statuses.values.every((status) => status.isGranted);
-          if (!permissionGranted) {
-            permissionTypeDenied = statuses.entries
-                .firstWhere((entry) => !entry.value.isGranted)
-                .key
-                .toString()
-                .split('.')
-                .last;
-          }
+        if (fileType == FileType.video) {
+          permissionsToRequest.add(Permission.videos);
         }
-      } else if (Platform.isIOS) {
-        if (fileType == FileType.image || fileType == FileType.video) {
-          if (!mounted) return;
-          var status = await Permission.photos.request();
-          if (!mounted) return;
-          permissionGranted = status.isGranted || status.isLimited;
-          if (!permissionGranted) permissionTypeDenied = 'photos';
-        } else {
+        if (permissionsToRequest.isEmpty) {
           permissionGranted = true;
         }
       } else {
+        permissionsToRequest.add(Permission.storage);
+      }
+      if (permissionsToRequest.isNotEmpty) {
+        if (!mounted) return;
+        Map<Permission, PermissionStatus> statuses =
+            await permissionsToRequest.request();
+        if (!mounted) return;
+        permissionGranted = statuses.values.every((status) => status.isGranted);
+        if (!permissionGranted) {
+          permissionTypeDenied = statuses.entries
+              .firstWhere((entry) => !entry.value.isGranted)
+              .key
+              .toString()
+              .split('.')
+              .last;
+        }
+      }
+    } else if (Platform.isIOS) {
+      if (fileType == FileType.image || fileType == FileType.video) {
+        if (!mounted) return;
+        var status = await Permission.photos.request();
+        if (!mounted) return;
+        permissionGranted = status.isGranted || status.isLimited;
+        if (!permissionGranted) permissionTypeDenied = 'photos';
+      } else {
         permissionGranted = true;
       }
+    } else {
+      permissionGranted = true;
     }
 
     if (!mounted) return; // Check mounted *after* async permission requests
@@ -994,20 +1184,25 @@ class _HomePageState extends ConsumerState<HomePage> {
         _selectedFileName = null;
         _selectedFileBytes = null;
       });
+      ref.read(deviceSelectionProvider.notifier).clearSelection();
+      _hasShownLongPressMultiSelectHint = false;
       if (!mounted) return;
-      FilePickerResult? result =
-          await FilePicker.platform.pickFiles(type: fileType, withData: true);
+      final bool shouldLoadBytes = fileType == FileType.image;
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: fileType,
+        withData: shouldLoadBytes,
+      );
       if (!mounted) return;
       if (!context.mounted) return;
       if (result != null && result.files.isNotEmpty) {
         PlatformFile file = result.files.single;
         _log.info(
-            'FilePicker result on ${kIsWeb ? "Web" : "Native"}: Name: ${file.name}, Path: ${kIsWeb ? "N/A (Web)" : file.path}, Bytes: ${file.bytes?.length}'); // Use logger
+            'FilePicker result on native: Name: ${file.name}, Path: ${file.path}, Bytes: ${file.bytes?.length}'); // Use logger
         final String fileName = file.name;
         final Uint8List? fileBytes = file.bytes;
-        final String? filePath = kIsWeb ? null : file.path;
+        final String? filePath = file.path;
         if (fileType == FileType.image &&
-            (fileBytes != null || (!kIsWeb && filePath != null))) {
+            (fileBytes != null || filePath != null)) {
           if (!mounted) return;
           showDialog(
             context: context,
@@ -1023,9 +1218,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                       Navigator.of(dialogContext).pop();
                       if (!mounted) return;
                       _navigateToEditor(
-                          bytes: fileBytes,
-                          path: kIsWeb ? null : filePath,
-                          fileName: fileName);
+                          bytes: fileBytes, path: filePath, fileName: fileName);
                     },
                   ),
                   TextButton(
@@ -1042,7 +1235,7 @@ class _HomePageState extends ConsumerState<HomePage> {
             },
           );
         } else if (fileType == FileType.video &&
-            (fileBytes != null || (!kIsWeb && filePath != null))) {
+            (fileBytes != null || filePath != null)) {
           if (!mounted) return;
           showDialog(
             context: context,
@@ -1053,18 +1246,15 @@ class _HomePageState extends ConsumerState<HomePage> {
                     const Text('Do you want to edit the video before sending?'),
                 actions: <Widget>[
                   TextButton(
-                    onPressed: kIsWeb
-                        ? null
-                        : () {
-                            Navigator.of(dialogContext).pop();
-                            if (!mounted) return;
-                            _navigateToVideoEditor(
-                                bytes: fileBytes,
-                                path: kIsWeb ? null : filePath,
-                                fileName: fileName);
-                          },
-                    child: Text('Edit Video',
-                        style: TextStyle(color: kIsWeb ? Colors.grey : null)),
+                    onPressed: () {
+                      Navigator.of(dialogContext).pop();
+                      if (!mounted) return;
+                      _navigateToVideoEditor(
+                          bytes: filePath == null ? fileBytes : null,
+                          path: filePath,
+                          fileName: fileName);
+                    },
+                    child: const Text('Edit Video'),
                   ),
                   TextButton(
                     child: const Text('Send Directly'),
@@ -1072,7 +1262,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                       Navigator.of(dialogContext).pop();
                       if (!mounted) return;
                       _setPickedFile(
-                          bytes: fileBytes, path: filePath, name: fileName);
+                          bytes: filePath == null ? fileBytes : null,
+                          path: filePath,
+                          name: fileName);
                     },
                   ),
                 ],
@@ -1081,13 +1273,8 @@ class _HomePageState extends ConsumerState<HomePage> {
           );
         } else if (fileBytes != null) {
           _setPickedFile(bytes: fileBytes, path: null, name: fileName);
-        } else if (!kIsWeb && filePath != null) {
+        } else if (filePath != null) {
           _setPickedFile(bytes: null, path: filePath, name: fileName);
-        } else if (kIsWeb && filePath != null) {
-          _log.warning(
-              'File picking error on Web: Only path is available, but bytes are required.'); // Use logger
-          if (!mounted) return;
-          showCopyableSnackBar(context, 'Failed to access selected file data.');
         } else {
           _log.warning(
               'File picking failed: No bytes or path available.'); // Use logger
@@ -1110,15 +1297,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   Future<void> _navigateToEditor(
       {Uint8List? bytes, String? path, required String fileName}) async {
     Uint8List? imageBytes = bytes;
-    if (kIsWeb && imageBytes == null) {
-      _log.warning(
-          'Error: Cannot edit image on web without image bytes.'); // Use logger
-      // No await before this context use
-      showCopyableSnackBar(
-          context, 'Cannot edit photo: Image data not available.');
-      return;
-    }
-    if (!kIsWeb && imageBytes == null && path != null) {
+    if (imageBytes == null && path != null) {
       try {
         // No context use before await
         imageBytes = await File(path).readAsBytes();
@@ -1154,19 +1333,13 @@ class _HomePageState extends ConsumerState<HomePage> {
         _selectedFileName = null;
         _selectedFileBytes = null;
       });
+      ref.read(deviceSelectionProvider.notifier).clearSelection();
+      _hasShownLongPressMultiSelectHint = false;
     }
   }
 
   Future<void> _navigateToVideoEditor(
       {Uint8List? bytes, String? path, required String fileName}) async {
-    if (kIsWeb) {
-      _log.warning('Video editing is not supported on the web.'); // Use logger
-      // No await before this context use
-      showCopyableSnackBar(
-          context, 'Video editing is not supported on the web.');
-      return;
-    }
-
     if (!Platform.isAndroid && !Platform.isIOS) {
       _log.warning(
           'Video editing is currently only supported on Android and iOS.');
@@ -1238,27 +1411,21 @@ class _HomePageState extends ConsumerState<HomePage> {
     if (!mounted) return; // Check after Navigator.push and tempFile.delete
 
     if (exportConfig != null) {
-      _log.info(
-          'Video editing confirmed. Preparing FFmpeg execution...'); // Use logger
-      _log.info('Command: ${exportConfig.command}'); // Use logger
-      _log.info('Output Path: ${exportConfig.outputPath}'); // Use logger
-      setState(() {});
-      showCopyableSnackBar(
-          context, 'Video processing is currently unavailable.');
+      _log.info('Video editing confirmed via pro_video_editor.');
+      _log.info('Task ID: ${exportConfig.taskId}');
+      _log.info('Output Path: ${exportConfig.outputPath}');
       setState(() {
-        _selectedFilePath = null;
-        _selectedFileName = null;
-        _selectedFileBytes = null;
         _isSending = false;
       });
+      _setPickedFile(
+        bytes: null,
+        path: exportConfig.outputPath,
+        name: 'edited_$fileName',
+      );
     } else {
       // This block runs if Navigator.push returned null (editing cancelled)
       _log.info('Video editing cancelled.'); // Use logger
       setState(() {
-        // Update state after Navigator.push returned
-        _selectedFilePath = null;
-        _selectedFileName = null;
-        _selectedFileBytes = null;
         _isSending = false;
       });
     }
@@ -1267,23 +1434,21 @@ class _HomePageState extends ConsumerState<HomePage> {
   void _setPickedFile({Uint8List? bytes, String? path, required String name}) {
     if (!mounted) return;
     setState(() {
-      _selectedFileBytes = bytes;
+      _selectedFileBytes = path == null ? bytes : null;
       _selectedFilePath = path;
       _selectedFileName = name;
     });
+    ref.read(deviceSelectionProvider.notifier).clearSelection();
+    _hasShownLongPressMultiSelectHint = false;
     _log.info(
         'Selected file: $name ${bytes != null ? "(from bytes)" : "(from path)"}'); // Use logger
     if (!mounted) return; // Check before using context
-    showCopyableSnackBar(context, 'Selected: $name. Tap a device to send.');
+    showCopyableSnackBar(context,
+        'Selected: $name. Tap a device to send. Long press to multi-select devices.');
   }
 
   Future<void> _scanQrCode() async {
     if (!mounted) return;
-    if (kIsWeb) {
-      showCopyableSnackBar(
-          context, 'QR Code scanning via camera is not supported on web.');
-      return;
-    }
     if (Platform.isWindows) {
       showCopyableSnackBar(
           context, 'QR Code scanning via camera is not supported on Windows.');

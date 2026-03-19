@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart'
-  show TargetPlatform, defaultTargetPlatform, kIsWeb;
+    show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:logging/logging.dart';
@@ -62,15 +62,6 @@ class SecurityService {
       'errorMessage': 'An unknown error occurred.'
     };
 
-    // Biometric authentication is not supported on web platforms.
-    if (kIsWeb) {
-      _logger.info('Biometric authentication is not available on the web.');
-      result['errorCode'] = errorNotAvailable;
-      result['errorMessage'] =
-          'Biometric authentication is not available on the web.';
-      return result;
-    }
-
     try {
       // Check if the device hardware supports biometric authentication.
       final bool deviceSupported = await _localAuth.isDeviceSupported();
@@ -103,15 +94,15 @@ class SecurityService {
 
       _logger.info("Available biometrics: $availableBiometrics");
 
-        final supportsBiometricOnly =
+      final supportsBiometricOnly =
           defaultTargetPlatform != TargetPlatform.windows;
-        if (!supportsBiometricOnly) {
+      if (!supportsBiometricOnly) {
         _logger.info(
-          'Windows detected. Using device credentials flow because biometricOnly is not supported.');
+            'Windows detected. Using device credentials flow because biometricOnly is not supported.');
         return _authenticateWithDeviceCredentials(localizedReason,
-          fallbackReason:
-            'Windows platform does not support biometricOnly parameter.');
-        }
+            fallbackReason:
+                'Windows platform does not support biometricOnly parameter.');
+      }
 
       // Attempt the actual biometric authentication.
       final bool didAuthenticate = await _localAuth.authenticate(
@@ -163,7 +154,8 @@ class SecurityService {
         case LocalAuthExceptionCode.noBiometricsEnrolled:
           result['errorCode'] = errorNotEnrolled;
           return _authenticateWithDeviceCredentials(localizedReason,
-              fallbackReason: 'No biometrics enrolled. Use device credentials.');
+              fallbackReason:
+                  'No biometrics enrolled. Use device credentials.');
         case LocalAuthExceptionCode.noCredentialsSet:
           result['errorCode'] = errorPasscodeNotSet;
           break;
@@ -207,8 +199,7 @@ class SecurityService {
       } else {
         result['success'] = false;
         result['errorCode'] = errorUnknown;
-        result['errorMessage'] =
-            'Authentication failed or was cancelled.';
+        result['errorMessage'] = 'Authentication failed or was cancelled.';
       }
       return result;
     } on LocalAuthException catch (e) {

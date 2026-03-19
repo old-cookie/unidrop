@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:unidrop/features/discovery/discovery_provider.dart';
 import 'package:unidrop/models/device_info.dart';
@@ -46,13 +45,8 @@ class DiscoveryService {
   /// Starts the discovery process.
   ///
   /// Binds a UDP socket, joins the multicast group, and starts sending
-  /// discovery packets periodically. Does nothing if discovery is already active
-  /// or if running on the web platform.
+  /// discovery packets periodically. Does nothing if discovery is already active.
   Future<void> startDiscovery() async {
-    if (kIsWeb) {
-      _logger.info('Discovery service is not supported on the web platform.');
-      return;
-    }
     // Do nothing if discovery is already running.
     if (_isDiscovering) {
       _logger
@@ -65,7 +59,7 @@ class DiscoveryService {
     _logger.info(
         'Preparing discovery with local IPs: ${_localIPs.toList()..sort()}');
     // Warn if local IPs couldn't be determined, as self-discovery filtering might fail.
-    if (_localIPs.isEmpty && !kIsWeb) {
+    if (_localIPs.isEmpty) {
       _logger.warning(
           "Could not determine local IP addresses. Self-discovery filtering might not work.");
     }
@@ -280,16 +274,8 @@ class DiscoveryService {
 
   /// Updates the set of local IP addresses.
   ///
-  /// Fetches network interfaces and extracts IPv4 addresses. Not supported on web.
+  /// Fetches network interfaces and extracts IPv4 addresses.
   Future<void> _updateLocalIPs() async {
-    // IP fetching is not supported on the web platform.
-    if (kIsWeb) {
-      _localIPs.clear(); // Ensure the set is empty on web.
-      _logger.info(
-          "Local IP address fetching is not supported on the web platform.");
-      return;
-    }
-
     _localIPs.clear(); // Clear the existing list before updating.
     _interfacesByIp.clear();
     try {

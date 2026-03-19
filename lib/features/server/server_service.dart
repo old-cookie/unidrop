@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logging/logging.dart';
 import 'package:unidrop/features/receive/received_file_provider.dart';
@@ -54,22 +53,12 @@ class ServerService {
       _logger.info('Starting HTTP server...');
       const int fixedPort = 2706;
       _logger.info('Starting HTTP server on fixed port $fixedPort...');
-      int? actualPort;
-      if (!kIsWeb) {
-        _server =
-            await shelf_io.serve(handler, InternetAddress.anyIPv4, fixedPort);
-        _logger.info('HTTP Server started');
-        actualPort = _server!.port;
-        _logger.info('Server listening on port $actualPort (HTTP only)');
-        _ref.read(serverStateProvider.notifier).setRunning(actualPort);
-      } else {
-        _logger.warning(
-            'Warning: Full HTTP server functionality is not available on the web platform.');
-        _ref
-            .read(serverStateProvider.notifier)
-            .setError('Server not supported on web');
-        return;
-      }
+      _server =
+          await shelf_io.serve(handler, InternetAddress.anyIPv4, fixedPort);
+      _logger.info('HTTP Server started');
+      final actualPort = _server!.port;
+      _logger.info('Server listening on port $actualPort (HTTP only)');
+      _ref.read(serverStateProvider.notifier).setRunning(actualPort);
     } catch (e) {
       _logger.severe('Error starting server: $e');
       _ref.read(serverStateProvider.notifier).setError(e.toString());
@@ -98,10 +87,10 @@ class ServerService {
   /// Returns JSON containing:
   /// - alias: Device name
   /// - version: Server version
-  /// - deviceModel: Operating system or 'web'
+  /// - deviceModel: Operating system
   /// - https: SSL status
   Future<Response> _handleInfoRequest(Request request) async {
-    final deviceModel = kIsWeb ? 'web' : Platform.operatingSystem;
+    final deviceModel = Platform.operatingSystem;
     final deviceInfo = {
       'alias': 'MyDevice',
       'version': '1.0.0',

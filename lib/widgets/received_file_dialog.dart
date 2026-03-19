@@ -1,12 +1,10 @@
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 import 'package:unidrop/features/receive/received_file_provider.dart';
 import 'package:unidrop/models/received_file_info.dart';
-import 'package:universal_html/html.dart' as html;
 import 'package:mime/mime.dart';
 import 'package:image/image.dart' as img;
 import 'package:fc_native_video_thumbnail/fc_native_video_thumbnail.dart';
@@ -136,7 +134,6 @@ class _ReceivedFileDialogState extends ConsumerState<ReceivedFileDialog> {
   }
 
   /// Processes the file keeping operation based on platform and file type.
-  /// For web: Initiates browser download
   /// For native platforms: Saves to gallery if image/video, or keeps in temp location
   /// Shows appropriate feedback messages and handles cleanup after operation.
   Future<void> _keepFile(BuildContext context) async {
@@ -144,59 +141,37 @@ class _ReceivedFileDialogState extends ConsumerState<ReceivedFileDialog> {
     bool deleteOriginal = false;
     final navigator = Navigator.of(context);
     try {
-      if (kIsWeb) {
+      _logger.info(
+          'Native platform detected. Keep action for ${widget.fileInfo.filename}');
+      message = Platform.isWindows
+          ? 'File "${widget.fileInfo.filename}" saved to Downloads.'
+          : 'File "${widget.fileInfo.filename}" kept in temporary location.'; // Default message
+      if (_mimeType != null &&
+          (_mimeType!.startsWith('image/') ||
+              _mimeType!.startsWith('video/'))) {
         _logger.info(
-            'Web platform detected. Attempting browser download for ${widget.fileInfo.filename}');
-        final file = File(widget.fileInfo.path);
-        if (await file.exists()) {
-          final bytes = await file.readAsBytes();
-          final blob = html.Blob([bytes], _mimeType);
-          final url = html.Url.createObjectUrlFromBlob(blob);
-          html.Url.revokeObjectUrl(url);
-          message = 'Downloading "${widget.fileInfo.filename}"...';
-          deleteOriginal = true;
-          _logger.info(
-              'Browser download initiated for ${widget.fileInfo.filename}');
+            'Attempting to save ${widget.fileInfo.filename} to gallery...');
+        if (Platform.isWindows) {
+          message =
+              '${_mimeType!.startsWith('image/') ? 'Photo' : 'Video'} "${widget.fileInfo.filename}" saved to Downloads.';
         } else {
-          message = 'Error: File not found for download.';
-          _logger.warning(
-              'File not found for web download: ${widget.fileInfo.path}');
+          final result =
+              await ImageGallerySaverPlus.saveFile(widget.fileInfo.path);
+          _logger.info('Gallery save result: $result');
+          if (result != null && result['isSuccess'] == true) {
+            message =
+                '${_mimeType!.startsWith('image/') ? 'Photo' : 'Video'} "${widget.fileInfo.filename}" saved to gallery.';
+            deleteOriginal = true; // Delete original if saved to gallery
+          } else {
+            message =
+                'Failed to save "${widget.fileInfo.filename}" to gallery. Kept in temporary location.';
+            _logger.warning(
+                'Gallery save failed or returned unexpected result: $result');
+          }
         }
       } else {
         _logger.info(
-            'Native platform detected. Keep action for ${widget.fileInfo.filename}');
-        message = Platform.isWindows
-            ? 'File "${widget.fileInfo.filename}" saved to Downloads.'
-            : 'File "${widget.fileInfo.filename}" kept in temporary location.'; // Default message
-        if (_mimeType != null &&
-            (_mimeType!.startsWith('image/') ||
-                _mimeType!.startsWith('video/'))) {
-          _logger.info(
-              'Attempting to save ${widget.fileInfo.filename} to gallery...');
-          if (Platform.isWindows) {
-            // On Windows, file is already saved to Downloads folder — just keep it there.
-            message =
-                '${_mimeType!.startsWith('image/') ? 'Photo' : 'Video'} "${widget.fileInfo.filename}" saved to Downloads.';
-            // deleteOriginal stays false — do not delete from Downloads
-          } else {
-            final result =
-                await ImageGallerySaverPlus.saveFile(widget.fileInfo.path);
-            _logger.info('Gallery save result: $result');
-            if (result != null && result['isSuccess'] == true) {
-              message =
-                  '${_mimeType!.startsWith('image/') ? 'Photo' : 'Video'} "${widget.fileInfo.filename}" saved to gallery.';
-              deleteOriginal = true; // Delete original if saved to gallery
-            } else {
-              message =
-                  'Failed to save "${widget.fileInfo.filename}" to gallery. Kept in temporary location.';
-              _logger.warning(
-                  'Gallery save failed or returned unexpected result: $result');
-            }
-          }
-        } else {
-          _logger.info(
-              'File type ($_mimeType) is not an image or video. Keeping in temporary location.');
-        }
+            'File type ($_mimeType) is not an image or video. Keeping in temporary location.');
       }
       if (deleteOriginal) {
         try {

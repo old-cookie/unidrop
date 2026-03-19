@@ -1,60 +1,63 @@
-# unidrop
+# UniDrop
 
-A Flutter application enabling secure, local network file and text sharing between devices. Features include automatic device discovery, media editing capabilities, and an integrated AI chat assistant powered by a local Gemma model.
+UniDrop 是一個 Flutter 區域網路傳輸應用程式，提供裝置間的檔案與文字傳送、QR 配對、媒體編輯與基本安全保護。
 
-## ✨ Features
+## ✨ 功能
 
-* **Local Network Discovery:** Automatically discover other devices running `unidrop` on the same network using `network_info_plus` and custom discovery logic (`lib/features/discovery/`).
-* **Secure File & Text Transfer:** Share files (`file_picker`) and text messages (`clipboard`) directly between devices using a local HTTP server (`shelf`, `shelf_router`, `shelf_multipart`).
-* **Image Editing:** Basic image editing functionalities provided by `image_editor_plus`.
-* **Video Editing:** Basic video editing functionalities using `video_editor` and `ffmpeg_kit_flutter_new`.
-* **AI Chat Assistant:** Chat with an onboard AI assistant using the Gemma model (`flutter_gemma`, `flutter_markdown`). The model runs locally (`assets/models/gemma3-1b-it-int4.task`).
-* **Cross-Platform:** Built with Flutter, targeting Android, iOS, Web, Windows, macOS, and Linux.
-* **Security:** Utilizes local authentication features (`local_auth`).
+- 區域網路裝置探索（UDP Multicast）。
+- 透過本機 HTTP 服務進行檔案與文字傳輸。
+- QR code 分享連線資訊與掃描配對。
+- 傳送前圖片編輯（Image Editor）。
+- 傳送前影片裁切與封面編輯（Android / iOS）。
+- 最愛裝置與多裝置選取傳送。
+- 設定頁提供裝置別名、主題、儲存目錄等設定。
+- 可選生物辨識解鎖（依平台支援）。
+- 使用加密偏好儲存（Encrypted Shared Preferences）。
 
-## 📸 Screenshots / Demo
+## 🧱 技術重點
 
+- Flutter + Riverpod 狀態管理。
+- 傳輸協定：HTTP（檔案 multipart + 文字 plain text）。
+- 探索機制：UDP Multicast（預設 224.0.0.1:2706）。
+- 主要模組位於 `lib/features/`（discovery、send、server、receive、security）。
 
-## 🚀 Getting Started
+## 🚀 快速開始
 
-### Prerequisites
+### 環境需求
 
-* Flutter SDK installed (check `pubspec.yaml` for version constraints, currently `>=3.7.2 <4.0.0`)
-* Platform-specific build tools (Android Studio/Xcode/Visual Studio/etc. depending on your target platform)
+- Flutter SDK（`pubspec.yaml` 目前為 `>=3.0.0 <4.0.0`）。
+- 對應平台建置工具（Android Studio / Xcode / Visual Studio 等）。
 
-### Installation & Setup
+### 安裝
 
-1. **Clone the repository:**
+```bash
+git clone <repository-url>
+cd unidrop
+flutter pub get
+```
 
-    ```bash
-    # Replace <repository-url> with the actual URL
-    git clone <repository-url>
-    cd unidrop
-    ```
+### 執行
 
-2.  **Install dependencies:**
+```bash
+flutter run
+```
 
-    ```bash
-    flutter pub get
-    ```
+## 📱 使用流程
 
-### Running the App
+1. 在同一區域網路啟動兩台以上裝置上的 UniDrop。
+2. 等待裝置自動出現在清單，或用 QR code 掃描配對。
+3. 選擇要傳送的檔案（圖片 / 影片 / 一般檔案）或輸入文字。
+4. 可選擇先編輯圖片或影片，再送出到目標裝置。
+5. 接收端可預覽並儲存收到的檔案或文字。
 
-1. Connect a device or start an emulator/simulator.
-2. Run the app from your IDE or using the command line:
+## 🔐 權限與平台注意事項
 
-    ```bash
-    flutter run
-    ```
+- Android 需宣告媒體存取權限（如 `READ_MEDIA_IMAGES`、`READ_MEDIA_VIDEO`）。
+- iOS 需提供 `NSPhotoLibraryUsageDescription` 與 `NSPhotoLibraryAddUsageDescription`。
+- 生物辨識在 Android 需宣告 `USE_BIOMETRIC` / `USE_FINGERPRINT`。
 
-*(Note: Ensure necessary permissions (network, storage, camera, etc.) are granted, potentially handled by `permission_handler`.)*
+## 🧪 測試
 
-## 💻 Usage
-
-*(Placeholder: Briefly describe the user flow)*
-
-1. Launch the app on two or more devices connected to the same local network.
-2. Devices should automatically appear in the discovery list.
-3. Select a device to initiate a connection or send data.
-4. Use the interface to send files, text messages, or start an AI chat session.
-5. Access image/video editing features through the relevant options (e.g., after selecting media).
+```bash
+flutter test
+```

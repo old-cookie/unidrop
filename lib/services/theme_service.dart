@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:encrypt_shared_preferences/provider.dart';
 
@@ -48,9 +47,8 @@ Future<void> resetSystemNavigation(
 
     Color effectiveStatusColor =
         (statusBarColor != null) ? statusBarColor : color!;
-    bool shouldBeTransparent = !kIsWeb &&
-        colorsEqual(effectiveStatusColor,
-            currentTheme.colorScheme.surface); // Use awaited theme
+    bool shouldBeTransparent = colorsEqual(effectiveStatusColor,
+        currentTheme.colorScheme.surface); // Use awaited theme
     SystemChrome.setSystemUIOverlayStyle(
       SystemUiOverlayStyle(
         statusBarIconBrightness:

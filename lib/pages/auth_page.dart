@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -41,11 +40,6 @@ class _AuthPageState extends ConsumerState<AuthPage> {
   /// Initiates the authentication process based on platform and settings
   Future<void> _checkAndAuthenticate() async {
     _log.info('Checking authentication method');
-    if (kIsWeb) {
-      _log.info('Web platform, proceeding to app');
-      _proceedToApp();
-      return;
-    }
     final bool biometricEnabled = ref.read(biometricAuthProvider);
     _log.info('Biometric enabled in settings: $biometricEnabled');
     if (biometricEnabled) {

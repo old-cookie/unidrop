@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -130,7 +130,7 @@ class MyApp extends ConsumerWidget {
       data: (settings) {
         // Settings loaded successfully
         final bool biometricsSupportedOnPlatform =
-            !kIsWeb && defaultTargetPlatform != TargetPlatform.macOS;
+            defaultTargetPlatform != TargetPlatform.macOS;
         final bool useBiometrics =
             settings.useBiometricAuth && biometricsSupportedOnPlatform;
         return MaterialApp(

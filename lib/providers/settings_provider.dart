@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:encrypt_shared_preferences/provider.dart';
 import 'package:device_info_plus/device_info_plus.dart';
@@ -142,9 +141,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
   // Now async to fetch device info
   static Future<String> _generateDefaultAlias() async {
     try {
-      if (kIsWeb) {
-        return 'Web Browser';
-      } else if (Platform.isAndroid) {
+      if (Platform.isAndroid) {
         final androidInfo = await _deviceInfoPlugin.androidInfo;
         return androidInfo.model; // Use device model name
       } else if (Platform.isIOS) {
@@ -169,7 +166,6 @@ class SettingsNotifier extends Notifier<SettingsState> {
   // The actual loaded state comes from settingsFutureProvider.
   static String _generateDefaultAliasSyncFallback() {
     try {
-      if (kIsWeb) return 'Web Browser';
       if (Platform.isAndroid) return 'Android Device';
       if (Platform.isIOS) return 'iOS Device';
       if (Platform.isLinux) return Platform.localHostname;

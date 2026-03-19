@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart'
-    show TargetPlatform, defaultTargetPlatform, kIsWeb;
+    show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -228,21 +228,18 @@ class SettingsPage extends ConsumerWidget {
               _showEditAliasDialog(context, ref, currentAlias);
             },
           ),
-          // Conditionally hide Destination Directory on web
-          if (!kIsWeb) ...[
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.folder_open_outlined),
-              title: const Text('Destination Directory'),
-              subtitle: Text(
-                  currentDestinationDir ?? 'Not set (Defaults to Downloads)'),
-              onTap: () {
-                _pickDestinationDirectory(context, ref);
-              },
-            ),
-          ], // End of conditional block for Destination Directory
           const Divider(),
-          if (!kIsWeb && defaultTargetPlatform != TargetPlatform.macOS)
+          ListTile(
+            leading: const Icon(Icons.folder_open_outlined),
+            title: const Text('Destination Directory'),
+            subtitle: Text(
+                currentDestinationDir ?? 'Not set (Defaults to Downloads)'),
+            onTap: () {
+              _pickDestinationDirectory(context, ref);
+            },
+          ),
+          const Divider(),
+          if (defaultTargetPlatform != TargetPlatform.macOS)
             SwitchListTile(
               secondary: const Icon(Icons.fingerprint),
               title: const Text('Use Biometric Authentication'),
