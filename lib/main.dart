@@ -1,9 +1,7 @@
-import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:unidrop/pages/home_page.dart';
-import 'package:unidrop/pages/auth_page.dart';
+import 'package:unidrop/pages/app_home.dart';
 import 'package:unidrop/providers/settings_provider.dart';
 import 'package:unidrop/services/theme_service.dart';
 import 'package:encrypt_shared_preferences/provider.dart';
@@ -128,17 +126,12 @@ class MyApp extends ConsumerWidget {
     // Use AsyncValue.when to handle loading/error states for settings
     return settingsAsyncValue.when(
       data: (settings) {
-        // Settings loaded successfully
-        final bool biometricsSupportedOnPlatform =
-            defaultTargetPlatform != TargetPlatform.macOS;
-        final bool useBiometrics =
-            settings.useBiometricAuth && biometricsSupportedOnPlatform;
         return MaterialApp(
           title: 'UniDrop',
           theme: themeState.lightTheme,
           darkTheme: themeState.darkTheme,
           themeMode: themeState.mode,
-          home: useBiometrics ? const AuthPage() : const HomePage(),
+          home: buildAppHome(settings),
         );
       },
       loading: () {

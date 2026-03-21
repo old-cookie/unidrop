@@ -42,13 +42,15 @@ class CustomEncryptor implements IEncryptor {
       if (charCode >= 65 && charCode <= 90) {
         int base = 65; // ASCII value of 'A'
         // Apply the shift, wrap around the alphabet using modulo 26
-        result.writeCharCode(((charCode - base + actualShift) % 26 + 26) % 26 + base);
+        result.writeCharCode(
+            ((charCode - base + actualShift) % 26 + 26) % 26 + base);
       }
       // Handle lowercase letters (a-z)
       else if (charCode >= 97 && charCode <= 122) {
         int base = 97; // ASCII value of 'a'
         // Apply the shift, wrap around the alphabet using modulo 26
-        result.writeCharCode(((charCode - base + actualShift) % 26 + 26) % 26 + base);
+        result.writeCharCode(
+            ((charCode - base + actualShift) % 26 + 26) % 26 + base);
       } else {
         // Keep non-alphabetic characters unchanged
         result.writeCharCode(charCode);

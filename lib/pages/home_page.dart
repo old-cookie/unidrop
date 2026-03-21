@@ -76,6 +76,27 @@ class _HomePageState extends ConsumerState<HomePage> {
   String? _scanResult;
   bool _hasShownLongPressMultiSelectHint = false;
 
+  bool _isImageFileName(String fileName) {
+    final fileNameLower = fileName.toLowerCase();
+    return fileNameLower.endsWith('.jpg') ||
+        fileNameLower.endsWith('.jpeg') ||
+        fileNameLower.endsWith('.png') ||
+        fileNameLower.endsWith('.gif') ||
+        fileNameLower.endsWith('.bmp') ||
+        fileNameLower.endsWith('.webp');
+  }
+
+  bool _isVideoFileName(String fileName) {
+    final fileNameLower = fileName.toLowerCase();
+    return fileNameLower.endsWith('.mp4') ||
+        fileNameLower.endsWith('.mov') ||
+        fileNameLower.endsWith('.avi') ||
+        fileNameLower.endsWith('.mkv') ||
+        fileNameLower.endsWith('.wmv') ||
+        fileNameLower.endsWith('.m4v') ||
+        fileNameLower.endsWith('.webm');
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1201,8 +1222,14 @@ class _HomePageState extends ConsumerState<HomePage> {
         final String fileName = file.name;
         final Uint8List? fileBytes = file.bytes;
         final String? filePath = file.path;
-        if (fileType == FileType.image &&
-            (fileBytes != null || filePath != null)) {
+        final bool isDetectedImage = _isImageFileName(fileName);
+        final bool isDetectedVideo = _isVideoFileName(fileName);
+        final bool shouldHandleAsImage = fileType == FileType.image ||
+            (fileType == FileType.any && isDetectedImage);
+        final bool shouldHandleAsVideo = fileType == FileType.video ||
+            (fileType == FileType.any && isDetectedVideo);
+
+        if (shouldHandleAsImage && (fileBytes != null || filePath != null)) {
           if (!mounted) return;
           showDialog(
             context: context,
@@ -1234,7 +1261,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               );
             },
           );
-        } else if (fileType == FileType.video &&
+        } else if (shouldHandleAsVideo &&
             (fileBytes != null || filePath != null)) {
           if (!mounted) return;
           showDialog(

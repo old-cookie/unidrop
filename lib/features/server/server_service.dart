@@ -20,6 +20,14 @@ class ServerService {
   HttpServer? _server;
   final _logger = Logger('ServerService');
 
+  static const Map<String, String> _corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Requested-With',
+    'Access-Control-Max-Age': '600',
+    'Access-Control-Allow-Private-Network': 'true',
+  };
+
   /// Constructs a [ServerService] instance
   ///
   /// [_ref] - Riverpod reference for state management
@@ -43,13 +51,18 @@ class ServerService {
       router.get('/', (Request request) {
         return Response.ok('Hello from UniDrop Server!');
       });
+      router.options('/<ignored|.*>', (Request request) {
+        return Response.ok('', headers: _corsHeaders);
+      });
       router.get('/info', _handleInfoRequest);
       router.post('/receive',
           (Request request) => _handleReceiveRequest(request, _ref));
       router.post('/receive-text',
           (Request request) => _handleReceiveTextRequest(request, _ref));
-      final handler =
-          const Pipeline().addMiddleware(logRequests()).addHandler(router.call);
+      final handler = const Pipeline()
+          .addMiddleware(logRequests())
+          .addMiddleware(_corsMiddleware())
+          .addHandler(router.call);
       _logger.info('Starting HTTP server...');
       const int fixedPort = 2706;
       _logger.info('Starting HTTP server on fixed port $fixedPort...');
@@ -81,6 +94,21 @@ class ServerService {
   /// Returns the current port number of the running server
   /// Returns null if server is not running
   int? get runningPort => _server?.port;
+
+  Middleware _corsMiddleware() {
+    return (innerHandler) {
+      return (request) async {
+        if (request.method == 'OPTIONS') {
+          return Response.ok('', headers: _corsHeaders);
+        }
+        final response = await innerHandler(request);
+        return response.change(headers: {
+          ...response.headers,
+          ..._corsHeaders,
+        });
+      };
+    };
+  }
 
   /// Handles server information requests
   ///

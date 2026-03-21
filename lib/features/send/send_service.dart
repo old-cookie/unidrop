@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
@@ -62,10 +61,9 @@ class SendService {
             _logger.info(
                 'Preparing to send $fileName ($bytesLength bytes) from memory...');
           } else {
-            final file = File(filePath!);
-            bytesLength = await file.length();
-            multipartFile = await http.MultipartFile.fromPath('file', filePath,
+            multipartFile = await http.MultipartFile.fromPath('file', filePath!,
                 filename: fileName);
+            bytesLength = multipartFile.length;
             _logger.info(
                 'Preparing to send $fileName ($bytesLength bytes) from path $filePath...');
           }
@@ -94,8 +92,12 @@ class SendService {
             throw Exception(_buildNetworkHelpMessage(targetDevice, error));
           }
           _logger.warning('Attempt ${retryCount + 1} failed: $error');
-        } on SocketException catch (e) {
-          final error = 'Socket error: ${e.message}';
+        } catch (e) {
+          final error = 'Network error: $e';
+          final errorText = e.toString();
+          if (errorText.contains('ClientException: Failed to fetch')) {
+            throw Exception(_buildPotentialDeliveryMessage(targetDevice));
+          }
           if (retryCount == maxRetries) {
             throw Exception(_buildNetworkHelpMessage(targetDevice, error));
           }
@@ -124,6 +126,13 @@ class SendService {
   String _buildNetworkHelpMessage(DeviceInfo targetDevice, String reason) {
     return '$reason. Cannot reach ${targetDevice.alias} (${targetDevice.ip}:${targetDevice.port}). '
         'Please ensure both devices are on the same LAN and allow UniDrop through firewall on port ${targetDevice.port}.';
+  }
+
+  String _buildPotentialDeliveryMessage(DeviceInfo targetDevice) {
+    return 'Browser reported Failed to fetch while uploading to '
+        '${targetDevice.alias} (${targetDevice.ip}:${targetDevice.port}). '
+        'The receiver may still have received the file. Please verify on receiver and ensure '
+        'CORS/private-network access is allowed.';
   }
 
   String _truncateText(String text, [int maxLength = 50]) {
@@ -182,8 +191,8 @@ class SendService {
             throw Exception(error);
           }
           _logger.warning('Attempt ${retryCount + 1} failed: $error');
-        } on SocketException catch (e) {
-          final error = 'Network error: ${e.message}';
+        } catch (e) {
+          final error = 'Network error: $e';
           if (retryCount == maxRetries) {
             throw Exception(error);
           }

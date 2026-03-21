@@ -1,5 +1,6 @@
 import 'dart:convert';
-import 'dart:io';
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:encrypt_shared_preferences/provider.dart';
 import 'package:device_info_plus/device_info_plus.dart';
@@ -141,18 +142,21 @@ class SettingsNotifier extends Notifier<SettingsState> {
   // Now async to fetch device info
   static Future<String> _generateDefaultAlias() async {
     try {
-      if (Platform.isAndroid) {
+      if (kIsWeb) {
+        return 'Web Browser';
+      }
+      if (defaultTargetPlatform == TargetPlatform.android) {
         final androidInfo = await _deviceInfoPlugin.androidInfo;
         return androidInfo.model; // Use device model name
-      } else if (Platform.isIOS) {
+      } else if (defaultTargetPlatform == TargetPlatform.iOS) {
         final iosInfo = await _deviceInfoPlugin.iosInfo;
         return iosInfo.name; // Use user-assigned device name
-      } else if (Platform.isLinux) {
-        return Platform.localHostname;
-      } else if (Platform.isMacOS) {
-        return Platform.localHostname;
-      } else if (Platform.isWindows) {
-        return Platform.localHostname;
+      } else if (defaultTargetPlatform == TargetPlatform.windows) {
+        return 'Windows Device';
+      } else if (defaultTargetPlatform == TargetPlatform.macOS) {
+        return 'macOS Device';
+      } else if (defaultTargetPlatform == TargetPlatform.linux) {
+        return 'Linux Device';
       }
     } catch (e) {
       _logger.warning("Error getting device name for default alias: $e", e);
@@ -166,11 +170,20 @@ class SettingsNotifier extends Notifier<SettingsState> {
   // The actual loaded state comes from settingsFutureProvider.
   static String _generateDefaultAliasSyncFallback() {
     try {
-      if (Platform.isAndroid) return 'Android Device';
-      if (Platform.isIOS) return 'iOS Device';
-      if (Platform.isLinux) return Platform.localHostname;
-      if (Platform.isMacOS) return Platform.localHostname;
-      if (Platform.isWindows) return Platform.localHostname;
+      if (kIsWeb) return 'Web Browser';
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        return 'Android Device';
+      }
+      if (defaultTargetPlatform == TargetPlatform.iOS) return 'iOS Device';
+      if (defaultTargetPlatform == TargetPlatform.linux) {
+        return 'Linux Device';
+      }
+      if (defaultTargetPlatform == TargetPlatform.macOS) {
+        return 'macOS Device';
+      }
+      if (defaultTargetPlatform == TargetPlatform.windows) {
+        return 'Windows Device';
+      }
     } catch (e) {
       // Ignore error in sync fallback
     }

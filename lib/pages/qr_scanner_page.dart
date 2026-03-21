@@ -12,7 +12,8 @@ class QrScannerPage extends StatefulWidget {
 }
 
 // State class that manages the QR scanner functionality
-class _QrScannerPageState extends State<QrScannerPage> with WidgetsBindingObserver {
+class _QrScannerPageState extends State<QrScannerPage>
+    with WidgetsBindingObserver {
   // Controller for the mobile scanner with auto start disabled
   final MobileScannerController controller = MobileScannerController(
     autoStart: false,

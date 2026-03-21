@@ -13,6 +13,7 @@ UniDrop 是一個 Flutter 區域網路傳輸應用程式，提供裝置間的檔
 - 設定頁提供裝置別名、主題、儲存目錄等設定。
 - 可選生物辨識解鎖（依平台支援）。
 - 使用加密偏好儲存（Encrypted Shared Preferences）。
+- Web 版支援手動目標的檔案傳送（sender-only，無 QR）。
 
 ## 🧱 技術重點
 
@@ -55,6 +56,13 @@ flutter run
 - Android 需宣告媒體存取權限（如 `READ_MEDIA_IMAGES`、`READ_MEDIA_VIDEO`）。
 - iOS 需提供 `NSPhotoLibraryUsageDescription` 與 `NSPhotoLibraryAddUsageDescription`。
 - 生物辨識在 Android 需宣告 `USE_BIOMETRIC` / `USE_FINGERPRINT`。
+
+## 🌐 Web（Sender-only）
+
+- Web 版僅提供傳送端功能：手動輸入接收端 `IP:Port`，選檔後可單送或批次送出。
+- 不使用中央伺服器；接收端仍需在 LAN 內執行 UniDrop 本機接收服務（HTTP 2706）。
+- Web 版不提供 QR 掃描/探索與接收模式。
+- 若 Web 與接收端不同來源，接收端需允許 CORS（本專案已加入）。
 
 ## 🧪 測試
 
