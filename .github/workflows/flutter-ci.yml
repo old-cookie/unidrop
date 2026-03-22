@@ -77,6 +77,10 @@ jobs:
             Copy-Item -Path $_.FullName -Destination "application" -Recurse -Force
           }
 
+      - name: Install go-msi
+        shell: pwsh
+        run: choco install -y go-msi
+
       - name: Build Windows Installer MSI from exe file
         uses: AliceOh/CreateWindowsInstaller@1.0.0
         with:
