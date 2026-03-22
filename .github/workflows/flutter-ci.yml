@@ -111,6 +111,20 @@ jobs:
 
           rm -rf flutter/ephemeral/.plugin_symlinks/pro_video_editor || true
 
+      - name: Fallback patch pro_video_editor Linux CMake
+        shell: bash
+        run: |
+          set -euo pipefail
+          PLUGIN_CMAKE="flutter/ephemeral/.plugin_symlinks/pro_video_editor/linux/CMakeLists.txt"
+          if [ -f "$PLUGIN_CMAKE" ]; then
+            echo "pro_video_editor still present for linux, applying source extension patch"
+            sed -i 's/src\/video_metadata\.cpp/src\/video_metadata.cc/g' "$PLUGIN_CMAKE"
+            sed -i 's/src\/thumbnail_generator\.cpp/src\/thumbnail_generator.cc/g' "$PLUGIN_CMAKE"
+            grep -n 'video_metadata\|thumbnail_generator' "$PLUGIN_CMAKE"
+          else
+            echo "pro_video_editor linux plugin symlink absent (expected)"
+          fi
+
       - name: Build Linux release
         run: flutter build linux --release
 
