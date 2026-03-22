@@ -12,10 +12,7 @@ import 'package:unidrop/utils/ip_address_utils.dart';
 import 'package:unidrop/widgets/copyable_error_snackbar.dart';
 
 class ShareLinkPage extends ConsumerStatefulWidget {
-  const ShareLinkPage({
-    super.key,
-    required this.localIpAddress,
-  });
+  const ShareLinkPage({super.key, required this.localIpAddress});
 
   final String localIpAddress;
 
@@ -128,15 +125,22 @@ class _ShareLinkPageState extends ConsumerState<ShareLinkPage> {
     return uri;
   }
 
-  Future<Uint8List?> _generateVideoThumbnailData(String videoPath,
-      {int maxWidth = 400, int quality = 40}) async {
+  Future<Uint8List?> _generateVideoThumbnailData(
+    String videoPath, {
+    int maxWidth = 400,
+    int quality = 40,
+  }) async {
     return FilePreviewerChannel.generateVideoThumbnail(videoPath);
   }
 
-  Future<Uint8List?> _generateVideoThumbnailFromBytes(Uint8List videoBytes,
-      {int maxWidth = 400, int quality = 40}) async {
+  Future<Uint8List?> _generateVideoThumbnailFromBytes(
+    Uint8List videoBytes, {
+    int maxWidth = 400,
+    int quality = 40,
+  }) async {
     final tempVideoFile = File(
-        '${Directory.systemTemp.path}${Platform.pathSeparator}share_video_${DateTime.now().millisecondsSinceEpoch}.mp4');
+      '${Directory.systemTemp.path}${Platform.pathSeparator}share_video_${DateTime.now().millisecondsSinceEpoch}.mp4',
+    );
     try {
       await tempVideoFile.writeAsBytes(videoBytes, flush: true);
       return await _generateVideoThumbnailData(
@@ -154,23 +158,25 @@ class _ShareLinkPageState extends ConsumerState<ShareLinkPage> {
   Widget _buildInAppPreview(ShareFileState shareFile) {
     final mime = shareFile.mimeType.toLowerCase();
     final lowerName = shareFile.fileName.toLowerCase();
-    final isImage = mime.startsWith('image/') ||
-      lowerName.endsWith('.jpg') ||
-      lowerName.endsWith('.jpeg') ||
-      lowerName.endsWith('.png') ||
-      lowerName.endsWith('.gif') ||
-      lowerName.endsWith('.bmp') ||
-      lowerName.endsWith('.webp') ||
-      lowerName.endsWith('.heic') ||
-      lowerName.endsWith('.heif');
-    final isVideo = mime.startsWith('video/') ||
-      lowerName.endsWith('.mp4') ||
-      lowerName.endsWith('.mov') ||
-      lowerName.endsWith('.m4v') ||
-      lowerName.endsWith('.webm') ||
-      lowerName.endsWith('.avi') ||
-      lowerName.endsWith('.mkv') ||
-      lowerName.endsWith('.wmv');
+    final isImage =
+        mime.startsWith('image/') ||
+        lowerName.endsWith('.jpg') ||
+        lowerName.endsWith('.jpeg') ||
+        lowerName.endsWith('.png') ||
+        lowerName.endsWith('.gif') ||
+        lowerName.endsWith('.bmp') ||
+        lowerName.endsWith('.webp') ||
+        lowerName.endsWith('.heic') ||
+        lowerName.endsWith('.heif');
+    final isVideo =
+        mime.startsWith('video/') ||
+        lowerName.endsWith('.mp4') ||
+        lowerName.endsWith('.mov') ||
+        lowerName.endsWith('.m4v') ||
+        lowerName.endsWith('.webm') ||
+        lowerName.endsWith('.avi') ||
+        lowerName.endsWith('.mkv') ||
+        lowerName.endsWith('.wmv');
     final webLink = _extractWebLinkUri(shareFile.sharedText);
 
     if (webLink != null) {
@@ -204,8 +210,10 @@ class _ShareLinkPageState extends ConsumerState<ShareLinkPage> {
       if (shareFile.hasBytes) {
         imageWidget = Image.memory(shareFile.fileBytes!, fit: BoxFit.contain);
       } else if (shareFile.hasPath) {
-        imageWidget =
-            Image.file(File(shareFile.filePath!), fit: BoxFit.contain);
+        imageWidget = Image.file(
+          File(shareFile.filePath!),
+          fit: BoxFit.contain,
+        );
       } else {
         imageWidget = const Text('Image preview unavailable.');
       }
@@ -249,24 +257,25 @@ class _ShareLinkPageState extends ConsumerState<ShareLinkPage> {
                       return SizedBox(
                         height: 220,
                         child: Center(
-                          child:
-                              Image.memory(snapshot.data!, fit: BoxFit.contain),
+                          child: Image.memory(
+                            snapshot.data!,
+                            fit: BoxFit.contain,
+                          ),
                         ),
                       );
                     }
                     return const SizedBox(
                       height: 200,
-                      child:
-                          Center(child: Text('Video thumbnail unavailable.')),
+                      child: Center(
+                        child: Text('Video thumbnail unavailable.'),
+                      ),
                     );
                   },
                 )
               else
                 const SizedBox(
                   height: 200,
-                  child: Center(
-                    child: Text('Video thumbnail unavailable.'),
-                  ),
+                  child: Center(child: Text('Video thumbnail unavailable.')),
                 ),
             ],
           ),
@@ -282,91 +291,87 @@ class _ShareLinkPageState extends ConsumerState<ShareLinkPage> {
     final shareFile = ref.watch(shareFileProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Send with link'),
-      ),
+      appBar: AppBar(title: const Text('Send with link')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: _isStarting
             ? const Center(child: CircularProgressIndicator())
             : _error != null
-                ? Center(child: Text(_error!))
-                : shareFile == null || _shareUrl == null
-                    ? const Center(
-                        child: Text('No file available for sharing.'))
-                    : SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+            ? Center(child: Text(_error!))
+            : shareFile == null || _shareUrl == null
+            ? const Center(child: Text('No file available for sharing.'))
+            : SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('File: ${shareFile.fileName}'),
+                    const SizedBox(height: 8),
+                    const Text('Available links:'),
+                    const SizedBox(height: 6),
+                    ..._allShareUrls.map(
+                      (url) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8.0),
+                        child: Row(
                           children: [
-                            Text('File: ${shareFile.fileName}'),
-                            const SizedBox(height: 8),
-                            const Text('Available links:'),
-                            const SizedBox(height: 6),
-                            ..._allShareUrls.map(
-                              (url) => Padding(
-                                padding: const EdgeInsets.only(bottom: 8.0),
-                                child: Row(
-                                  children: [
-                                    Expanded(child: SelectableText(url)),
-                                    const SizedBox(width: 8),
-                                    OutlinedButton.icon(
-                                      onPressed: () {
-                                        unawaited(Clipboard.setData(
-                                            ClipboardData(text: url)));
-                                        showCopyableSnackBar(
-                                            context, 'Copied: $url');
-                                      },
-                                      icon: const Icon(Icons.copy),
-                                      label: const Text('Copy'),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            _buildInAppPreview(shareFile),
-                            const SizedBox(height: 16),
-                            Center(
-                              child: Column(
-                                children: [
-                                  GestureDetector(
-                                    onTap: _allShareUrls.length > 1
-                                        ? _showNextQr
-                                        : null,
-                                    child: Container(
-                                      color: Colors.white,
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: SizedBox(
-                                        width: 220,
-                                        height: 220,
-                                        child: PrettyQrView.data(
-                                          data: _shareUrl!,
-                                          decoration: const PrettyQrDecoration(
-                                            shape: PrettyQrSmoothSymbol(
-                                                color: Colors.black),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'QR IP: ${_extractIpFromUrl(_shareUrl!)}',
-                                    style:
-                                        Theme.of(context).textTheme.bodySmall,
-                                  ),
-                                  if (_allShareUrls.length > 1)
-                                    Text(
-                                      'Tap QR to switch IP (${_currentQrIndex + 1}/${_allShareUrls.length})',
-                                      style:
-                                          Theme.of(context).textTheme.bodySmall,
-                                    ),
-                                ],
-                              ),
+                            Expanded(child: SelectableText(url)),
+                            const SizedBox(width: 8),
+                            OutlinedButton.icon(
+                              onPressed: () {
+                                unawaited(
+                                  Clipboard.setData(ClipboardData(text: url)),
+                                );
+                                showCopyableSnackBar(context, 'Copied: $url');
+                              },
+                              icon: const Icon(Icons.copy),
+                              label: const Text('Copy'),
                             ),
                           ],
                         ),
                       ),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildInAppPreview(shareFile),
+                    const SizedBox(height: 16),
+                    Center(
+                      child: Column(
+                        children: [
+                          GestureDetector(
+                            onTap: _allShareUrls.length > 1
+                                ? _showNextQr
+                                : null,
+                            child: Container(
+                              color: Colors.white,
+                              padding: const EdgeInsets.all(8.0),
+                              child: SizedBox(
+                                width: 220,
+                                height: 220,
+                                child: PrettyQrView.data(
+                                  data: _shareUrl!,
+                                  decoration: const PrettyQrDecoration(
+                                    shape: PrettyQrSmoothSymbol(
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'QR IP: ${_extractIpFromUrl(_shareUrl!)}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          if (_allShareUrls.length > 1)
+                            Text(
+                              'Tap QR to switch IP (${_currentQrIndex + 1}/${_allShareUrls.length})',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
       ),
     );
   }

@@ -115,51 +115,55 @@ class _HomePageState extends ConsumerState<HomePage> {
       await _discoveryService!.startDiscovery();
       if (!mounted) return;
       _receivedFileSubscription = localRef.listenManual<ReceivedFileInfo?>(
-          receivedFileProvider, (previous, fileInfo) {
-        if (fileInfo != null) {
-          if (!mounted) return;
-          // Removed context capture and route check before microtask
-          Future.microtask(() {
-            // Check mounted *inside* microtask before using context
+        receivedFileProvider,
+        (previous, fileInfo) {
+          if (fileInfo != null) {
             if (!mounted) return;
-            showDialog(
-              context: context, // Use context directly after mounted check
-              barrierDismissible: false,
-              builder: (BuildContext dialogContext) {
-                return ReceivedFileDialog(fileInfo: fileInfo);
-              },
-            ).then((_) {
-              if (mounted) {
-                localRef
-                    .read(receivedFileProvider.notifier)
-                    .clearReceivedFile();
-              }
+            // Removed context capture and route check before microtask
+            Future.microtask(() {
+              // Check mounted *inside* microtask before using context
+              if (!mounted) return;
+              showDialog(
+                context: context, // Use context directly after mounted check
+                barrierDismissible: false,
+                builder: (BuildContext dialogContext) {
+                  return ReceivedFileDialog(fileInfo: fileInfo);
+                },
+              ).then((_) {
+                if (mounted) {
+                  localRef
+                      .read(receivedFileProvider.notifier)
+                      .clearReceivedFile();
+                }
+              });
             });
-          });
-        }
-      });
-      _receivedTextSubscription = localRef
-          .listenManual<String?>(receivedTextProvider, (previous, text) {
-        if (text != null) {
-          if (!mounted) return;
-          // Removed context capture and route check before microtask
-          Future.microtask(() {
-            // Check mounted *inside* microtask before using context
+          }
+        },
+      );
+      _receivedTextSubscription = localRef.listenManual<String?>(
+        receivedTextProvider,
+        (previous, text) {
+          if (text != null) {
             if (!mounted) return;
-            showDialog(
-              context: context, // Use context directly after mounted check
-              barrierDismissible: false,
-              builder: (BuildContext dialogContext) {
-                return ReceivedTextDialog(receivedText: text);
-              },
-            ).then((_) {
-              if (mounted) {
-                localRef.read(receivedTextProvider.notifier).setText(null);
-              }
+            // Removed context capture and route check before microtask
+            Future.microtask(() {
+              // Check mounted *inside* microtask before using context
+              if (!mounted) return;
+              showDialog(
+                context: context, // Use context directly after mounted check
+                barrierDismissible: false,
+                builder: (BuildContext dialogContext) {
+                  return ReceivedTextDialog(receivedText: text);
+                },
+              ).then((_) {
+                if (mounted) {
+                  localRef.read(receivedTextProvider.notifier).setText(null);
+                }
+              });
             });
-          });
-        }
-      });
+          }
+        },
+      );
     });
   }
 
@@ -199,8 +203,11 @@ class _HomePageState extends ConsumerState<HomePage> {
     return IpAddressUtils.findBestLocalIpv4();
   }
 
-  Future<Uint8List?> _generateVideoThumbnailData(String videoPath,
-      {int maxWidth = 150, int quality = 25}) async {
+  Future<Uint8List?> _generateVideoThumbnailData(
+    String videoPath, {
+    int maxWidth = 150,
+    int quality = 25,
+  }) async {
     return FilePreviewerChannel.generateVideoThumbnail(videoPath);
   }
 
@@ -224,7 +231,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     // Use the SettingsNotifier to add the favorite
     final deviceData = {
       'ip': ip,
-      'name': name
+      'name': name,
     }; // Assuming port is fixed or handled elsewhere
     // Rely on the check within addFavoriteDevice in the provider
 
@@ -233,7 +240,8 @@ class _HomePageState extends ConsumerState<HomePage> {
     try {
       await ref.read(settingsProvider.notifier).addFavoriteDevice(deviceData);
       _log.info(
-          "Successfully called addFavoriteDevice for: $deviceData"); // Use logger
+        "Successfully called addFavoriteDevice for: $deviceData",
+      ); // Use logger
       if (!mounted) return false; // Check after await
       // Clear fields and unfocus after successful add
       _ipController.clear();
@@ -273,10 +281,14 @@ class _HomePageState extends ConsumerState<HomePage> {
       if (_selectedFileName != null &&
           (_selectedFilePath != null || _selectedFileBytes != null)) {
         if (showProgressSnackBar) {
-          showCopyableSnackBar(context,
-              'Sending file $_selectedFileName to ${targetDevice.alias}...');
+          showCopyableSnackBar(
+            context,
+            'Sending file $_selectedFileName to ${targetDevice.alias}...',
+          );
         }
-        await ref.read(sendServiceProvider).sendFile(
+        await ref
+            .read(sendServiceProvider)
+            .sendFile(
               targetDevice,
               _selectedFileName!,
               filePath: _selectedFilePath,
@@ -285,7 +297,9 @@ class _HomePageState extends ConsumerState<HomePage> {
         if (!mounted) return false;
         if (showSuccessSnackBar) {
           showCopyableSnackBar(
-              context, 'Sent $_selectedFileName successfully!');
+            context,
+            'Sent $_selectedFileName successfully!',
+          );
         }
         sentSuccessfully = true;
 
@@ -304,7 +318,9 @@ class _HomePageState extends ConsumerState<HomePage> {
           if (showProgressSnackBar) {
             scaffoldMessenger.hideCurrentSnackBar();
             showCopyableSnackBar(
-                context, 'Sending text to ${targetDevice.alias}...');
+              context,
+              'Sending text to ${targetDevice.alias}...',
+            );
           }
           try {
             await ref
@@ -322,7 +338,9 @@ class _HomePageState extends ConsumerState<HomePage> {
           }
         } else {
           showCopyableSnackBar(
-              context, 'Please enter text or select a file to send.');
+            context,
+            'Please enter text or select a file to send.',
+          );
           return false;
         }
       }
@@ -352,7 +370,8 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   Future<void> _handleBatchSend(
-      List<_DiscoveredDeviceGroup> groupedDiscoveredDevices) async {
+    List<_DiscoveredDeviceGroup> groupedDiscoveredDevices,
+  ) async {
     if (!mounted || _isSending) return;
     if (_selectedFileName == null ||
         (_selectedFilePath == null && _selectedFileBytes == null)) {
@@ -378,13 +397,17 @@ class _HomePageState extends ConsumerState<HomePage> {
     if (targets.isEmpty) {
       ref.read(deviceSelectionProvider.notifier).clearSelection();
       showCopyableSnackBar(
-          context, 'Selected devices are no longer available.');
+        context,
+        'Selected devices are no longer available.',
+      );
       return;
     }
 
     final fileName = _selectedFileName;
     showCopyableSnackBar(
-        context, 'Sending $fileName to ${targets.length} devices...');
+      context,
+      'Sending $fileName to ${targets.length} devices...',
+    );
 
     setState(() {
       _isSending = true;
@@ -420,17 +443,22 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     if (failedCount == 0) {
       showCopyableSnackBar(
-          context, 'Sent to $successCount devices successfully!');
+        context,
+        'Sent to $successCount devices successfully!',
+      );
     } else {
       showCopyableSnackBar(
-          context, 'Batch done. Success: $successCount, Failed: $failedCount.');
+        context,
+        'Batch done. Success: $successCount, Failed: $failedCount.',
+      );
     }
   }
 
   Future<void> _openShareLinkPage() async {
     if (!mounted) return;
     final textToShare = _textController.text.trim();
-    final hasSelectedFile = _selectedFileName != null &&
+    final hasSelectedFile =
+        _selectedFileName != null &&
         (_selectedFilePath != null || _selectedFileBytes != null);
     if (!hasSelectedFile && textToShare.isEmpty) {
       showCopyableSnackBar(context, 'Please select a file or enter text.');
@@ -472,9 +500,11 @@ class _HomePageState extends ConsumerState<HomePage> {
           return;
         }
       }
-        final detectedMime =
-          lookupMimeType(filePath ?? fileName, headerBytes: fileBytes);
-        mimeType = _resolveShareMimeType(fileName, detectedMime);
+      final detectedMime = lookupMimeType(
+        filePath ?? fileName,
+        headerBytes: fileBytes,
+      );
+      mimeType = _resolveShareMimeType(fileName, detectedMime);
     } else {
       fileName = 'unidrop_text_${DateTime.now().millisecondsSinceEpoch}.txt';
       sharedText = textToShare;
@@ -484,7 +514,9 @@ class _HomePageState extends ConsumerState<HomePage> {
       mimeType = 'text/plain; charset=utf-8';
     }
 
-    ref.read(shareFileProvider.notifier).setShareFile(
+    ref
+        .read(shareFileProvider.notifier)
+        .setShareFile(
           fileName: fileName,
           mimeType: mimeType,
           fileSize: fileSize,
@@ -562,7 +594,8 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   List<_DiscoveredDeviceGroup> _groupDiscoveredDevices(
-      List<DeviceInfo> discoveredDevices) {
+    List<DeviceInfo> discoveredDevices,
+  ) {
     final groups = <String, List<DeviceInfo>>{};
 
     for (final device in discoveredDevices) {
@@ -582,8 +615,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         port: firstDevice.port,
         devices: devices,
       );
-    }).toList()
-      ..sort((left, right) => left.alias.compareTo(right.alias));
+    }).toList()..sort((left, right) => left.alias.compareTo(right.alias));
 
     return groupedDevices;
   }
@@ -596,7 +628,9 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   bool _groupContainsSelectedDevice(
-      _DiscoveredDeviceGroup group, Set<String> selectedKeys) {
+    _DiscoveredDeviceGroup group,
+    Set<String> selectedKeys,
+  ) {
     for (final device in group.devices) {
       if (selectedKeys.contains(_selectionKeyForDevice(device))) {
         return true;
@@ -606,7 +640,9 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   int _selectedDeviceCountInGroup(
-      _DiscoveredDeviceGroup group, Set<String> selectedKeys) {
+    _DiscoveredDeviceGroup group,
+    Set<String> selectedKeys,
+  ) {
     var count = 0;
     for (final device in group.devices) {
       if (selectedKeys.contains(_selectionKeyForDevice(device))) {
@@ -616,8 +652,10 @@ class _HomePageState extends ConsumerState<HomePage> {
     return count;
   }
 
-  Future<DeviceInfo?> _pickDeviceFromGroup(_DiscoveredDeviceGroup group,
-      {required String title}) async {
+  Future<DeviceInfo?> _pickDeviceFromGroup(
+    _DiscoveredDeviceGroup group, {
+    required String title,
+  }) async {
     return showDialog<DeviceInfo>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -662,13 +700,15 @@ class _HomePageState extends ConsumerState<HomePage> {
       return const SizedBox.shrink();
     }
     final fileNameLower = _selectedFileName!.toLowerCase();
-    final isImage = fileNameLower.endsWith('.jpg') ||
+    final isImage =
+        fileNameLower.endsWith('.jpg') ||
         fileNameLower.endsWith('.jpeg') ||
         fileNameLower.endsWith('.png') ||
         fileNameLower.endsWith('.gif') ||
         fileNameLower.endsWith('.bmp') ||
         fileNameLower.endsWith('.webp');
-    final isVideo = fileNameLower.endsWith('.mp4') ||
+    final isVideo =
+        fileNameLower.endsWith('.mp4') ||
         fileNameLower.endsWith('.mov') ||
         fileNameLower.endsWith('.avi') ||
         fileNameLower.endsWith('.mkv') ||
@@ -678,8 +718,10 @@ class _HomePageState extends ConsumerState<HomePage> {
       if (_selectedFileBytes != null) {
         thumbnailWidget = Image.memory(_selectedFileBytes!, fit: BoxFit.cover);
       } else if (_selectedFilePath != null) {
-        thumbnailWidget =
-            Image.file(File(_selectedFilePath!), fit: BoxFit.cover);
+        thumbnailWidget = Image.file(
+          File(_selectedFilePath!),
+          fit: BoxFit.cover,
+        );
       } else {
         thumbnailWidget = const Icon(Icons.image_not_supported, size: 50);
       }
@@ -695,8 +737,10 @@ class _HomePageState extends ConsumerState<HomePage> {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             } else if (snapshot.hasError) {
-              _log.warning('Error generating video thumbnail',
-                  snapshot.error); // Use logger
+              _log.warning(
+                'Error generating video thumbnail',
+                snapshot.error,
+              ); // Use logger
               return const Icon(Icons.video_file_outlined, size: 50);
             } else if (snapshot.hasData && snapshot.data != null) {
               return Image.memory(snapshot.data!, fit: BoxFit.cover);
@@ -718,8 +762,10 @@ class _HomePageState extends ConsumerState<HomePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Selected: $_selectedFileName',
-              style: Theme.of(context).textTheme.bodySmall),
+          Text(
+            'Selected: $_selectedFileName',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
           const SizedBox(height: 4),
           Stack(
             children: [
@@ -727,12 +773,14 @@ class _HomePageState extends ConsumerState<HomePage> {
                 height: 100,
                 width: double.infinity,
                 decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade300),
-                    borderRadius: BorderRadius.circular(4.0)),
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(4.0),
+                ),
                 alignment: Alignment.center,
                 child: ClipRRect(
-                    borderRadius: BorderRadius.circular(4.0),
-                    child: thumbnailWidget),
+                  borderRadius: BorderRadius.circular(4.0),
+                  child: thumbnailWidget,
+                ),
               ),
               Positioned(
                 top: 4,
@@ -753,8 +801,11 @@ class _HomePageState extends ConsumerState<HomePage> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     padding: const EdgeInsets.all(2),
-                    child:
-                        const Icon(Icons.close, color: Colors.white, size: 16),
+                    child: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 16,
+                    ),
                   ),
                 ),
               ),
@@ -767,8 +818,9 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final List<DeviceInfo> discoveredDevices =
-        ref.watch(discoveredDevicesProvider);
+    final List<DeviceInfo> discoveredDevices = ref.watch(
+      discoveredDevicesProvider,
+    );
     final groupedDiscoveredDevices = _groupDiscoveredDevices(discoveredDevices);
     final selectedDeviceKeys = ref.watch(deviceSelectionProvider);
     final alias = ref.watch(deviceAliasProvider);
@@ -780,7 +832,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       final qrInfo = {
         'ip': _localIpAddress,
         'port': serverState.port,
-        'alias': alias
+        'alias': alias,
       };
       qrData = jsonEncode(qrInfo);
     }
@@ -790,9 +842,10 @@ class _HomePageState extends ConsumerState<HomePage> {
         title: const Text('Unidrop'),
         actions: [
           IconButton(
-              icon: const Icon(Icons.star),
-              onPressed: _showFavoritesDialog,
-              tooltip: 'Show Favorites'),
+            icon: const Icon(Icons.star),
+            onPressed: _showFavoritesDialog,
+            tooltip: 'Show Favorites',
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _manualRefreshDiscovery,
@@ -804,9 +857,9 @@ class _HomePageState extends ConsumerState<HomePage> {
               onPressed: () {
                 if (!mounted) return;
                 Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const SettingsPage()));
+                  context,
+                  MaterialPageRoute(builder: (context) => const SettingsPage()),
+                );
               },
               tooltip: 'Settings',
             )
@@ -822,9 +875,11 @@ class _HomePageState extends ConsumerState<HomePage> {
                   case 'settings':
                     if (!mounted) return;
                     Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const SettingsPage()));
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const SettingsPage(),
+                      ),
+                    );
                     break;
                 }
               },
@@ -833,20 +888,27 @@ class _HomePageState extends ConsumerState<HomePage> {
 
                 bool needsDivider = false;
 
-                items.add(const PopupMenuItem<String>(
-                  value: 'scan_qr',
-                  child: ListTile(
+                items.add(
+                  const PopupMenuItem<String>(
+                    value: 'scan_qr',
+                    child: ListTile(
                       leading: Icon(Icons.qr_code_scanner),
-                      title: Text('Scan QR')),
-                ));
+                      title: Text('Scan QR'),
+                    ),
+                  ),
+                );
                 needsDivider = true;
 
                 if (needsDivider) items.add(const PopupMenuDivider());
-                items.add(const PopupMenuItem<String>(
-                  value: 'settings',
-                  child: ListTile(
-                      leading: Icon(Icons.settings), title: Text('Settings')),
-                ));
+                items.add(
+                  const PopupMenuItem<String>(
+                    value: 'settings',
+                    child: ListTile(
+                      leading: Icon(Icons.settings),
+                      title: Text('Settings'),
+                    ),
+                  ),
+                );
 
                 return items;
               },
@@ -872,12 +934,16 @@ class _HomePageState extends ConsumerState<HomePage> {
                             if (ipToCopy == null || ipToCopy.isEmpty) {
                               if (!mounted) return;
                               showCopyableSnackBar(
-                                  context, 'No IP available to copy.');
+                                context,
+                                'No IP available to copy.',
+                              );
                               return;
                             }
                             Clipboard.setData(ClipboardData(text: ipToCopy));
                             showCopyableSnackBar(
-                                context, 'Copied IP: $ipToCopy');
+                              context,
+                              'Copied IP: $ipToCopy',
+                            );
                           },
                           child: Container(
                             color: Colors.white,
@@ -888,8 +954,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                               child: PrettyQrView.data(
                                 data: qrData,
                                 decoration: const PrettyQrDecoration(
-                                  shape:
-                                      PrettyQrSmoothSymbol(color: Colors.black),
+                                  shape: PrettyQrSmoothSymbol(
+                                    color: Colors.black,
+                                  ),
                                 ),
                               ),
                             ),
@@ -925,12 +992,16 @@ class _HomePageState extends ConsumerState<HomePage> {
               ),
             ),
             Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 8.0,
+                vertical: 4.0,
+              ),
               child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                      'Discovered Devices (${groupedDiscoveredDevices.length}):')),
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Discovered Devices (${groupedDiscoveredDevices.length}):',
+                ),
+              ),
             ),
             Expanded(
               child: discoveredDevices.isEmpty
@@ -940,25 +1011,33 @@ class _HomePageState extends ConsumerState<HomePage> {
                       itemBuilder: (context, index) {
                         final deviceGroup = groupedDiscoveredDevices[index];
                         final isSelected = _groupContainsSelectedDevice(
-                            deviceGroup, selectedDeviceKeys);
+                          deviceGroup,
+                          selectedDeviceKeys,
+                        );
                         final selectedCount = _selectedDeviceCountInGroup(
-                            deviceGroup, selectedDeviceKeys);
+                          deviceGroup,
+                          selectedDeviceKeys,
+                        );
                         return ListTile(
                           leading: _isSending
                               ? const CircularProgressIndicator()
                               : const Icon(Icons.devices),
                           selected: isSelected,
                           title: Text(deviceGroup.alias),
-                          subtitle: Text(deviceGroup.hasMultipleIps
-                              ? '${deviceGroup.subtitle} (${deviceGroup.devices.length} IPs)'
-                              : '${deviceGroup.devices.first.ip}:${deviceGroup.port}'),
+                          subtitle: Text(
+                            deviceGroup.hasMultipleIps
+                                ? '${deviceGroup.subtitle} (${deviceGroup.devices.length} IPs)'
+                                : '${deviceGroup.devices.first.ip}:${deviceGroup.port}',
+                          ),
                           trailing: (isSelected || deviceGroup.hasMultipleIps)
                               ? Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     if (selectedCount > 0) ...[
-                                      const Icon(Icons.check_circle,
-                                          color: Colors.green),
+                                      const Icon(
+                                        Icons.check_circle,
+                                        color: Colors.green,
+                                      ),
                                       const SizedBox(width: 4),
                                       Text('$selectedCount'),
                                     ],
@@ -989,8 +1068,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                                     return;
                                   }
                                   final key = _selectionKeyForDevice(target);
-                                  final notifier = ref
-                                      .read(deviceSelectionProvider.notifier);
+                                  final notifier = ref.read(
+                                    deviceSelectionProvider.notifier,
+                                  );
                                   notifier.toggleSelection(key);
 
                                   final isNowSelected = ref
@@ -1004,8 +1084,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                                   );
                                   if (!_hasShownLongPressMultiSelectHint) {
                                     _hasShownLongPressMultiSelectHint = true;
-                                    showCopyableSnackBar(this.context,
-                                        'Device selected. Tap "Send to N" for batch send.');
+                                    showCopyableSnackBar(
+                                      this.context,
+                                      'Device selected. Tap "Send to N" for batch send.',
+                                    );
                                   }
                                 },
                         );
@@ -1017,8 +1099,12 @@ class _HomePageState extends ConsumerState<HomePage> {
               // Hide when keyboard is visible
               visible: MediaQuery.of(context).viewInsets.bottom == 0,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0,
-                    48.0), // Adjusted bottom padding if needed when hidden
+                padding: const EdgeInsets.fromLTRB(
+                  16.0,
+                  16.0,
+                  16.0,
+                  48.0,
+                ), // Adjusted bottom padding if needed when hidden
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
@@ -1053,7 +1139,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                                       onTap: () async {
                                         Navigator.pop(context);
                                         await _pickFile(
-                                            context, FileType.video);
+                                          context,
+                                          FileType.video,
+                                        );
                                       },
                                     ),
                                   ListTile(
@@ -1109,12 +1197,18 @@ class _HomePageState extends ConsumerState<HomePage> {
             // Read the current favorites list from the provider
             final favoritesList = ref.watch(favoriteDevicesProvider);
             _log.fine(
-                "Favorites Dialog Consumer rebuilt. Received list: $favoritesList"); // Use logger (fine level for rebuilds)
+              "Favorites Dialog Consumer rebuilt. Received list: $favoritesList",
+            ); // Use logger (fine level for rebuilds)
             // Convert List<Map<String, String>> to List<DeviceInfo> for compatibility
             // Assuming a fixed port or handle differently if port varies
             final favorites = favoritesList
-                .map((fav) =>
-                    DeviceInfo(ip: fav['ip']!, port: 2706, alias: fav['name']!))
+                .map(
+                  (fav) => DeviceInfo(
+                    ip: fav['ip']!,
+                    port: 2706,
+                    alias: fav['name']!,
+                  ),
+                )
                 .toList();
 
             return AlertDialog(
@@ -1128,19 +1222,22 @@ class _HomePageState extends ConsumerState<HomePage> {
                       TextField(
                         controller: _ipController,
                         decoration: const InputDecoration(
-                            labelText: 'IP Address',
-                            hintText: 'e.g., 192.168.1.100',
-                            border: OutlineInputBorder()),
-                        keyboardType:
-                            TextInputType.numberWithOptions(decimal: true),
+                          labelText: 'IP Address',
+                          hintText: 'e.g., 192.168.1.100',
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       TextField(
                         controller: _nameController,
                         decoration: const InputDecoration(
-                            labelText: 'Device Name',
-                            hintText: 'e.g., My Laptop',
-                            border: OutlineInputBorder()),
+                          labelText: 'Device Name',
+                          hintText: 'e.g., My Laptop',
+                          border: OutlineInputBorder(),
+                        ),
                       ),
                       const SizedBox(height: 8),
                       ElevatedButton.icon(
@@ -1153,11 +1250,14 @@ class _HomePageState extends ConsumerState<HomePage> {
                         },
                       ),
                       const Divider(height: 24),
-                      favorites.isEmpty // Use the list from the provider
+                      favorites
+                              .isEmpty // Use the list from the provider
                           ? const Center(
                               child: Padding(
-                                  padding: EdgeInsets.symmetric(vertical: 16.0),
-                                  child: Text('No favorites added yet.')))
+                                padding: EdgeInsets.symmetric(vertical: 16.0),
+                                child: Text('No favorites added yet.'),
+                              ),
+                            )
                           : ListView.builder(
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
@@ -1168,24 +1268,27 @@ class _HomePageState extends ConsumerState<HomePage> {
                                   // Use the list from the provider
                                   return const SizedBox.shrink();
                                 }
-                                final device = favorites[
-                                    index]; // Use the list from the provider
+                                final device =
+                                    favorites[index]; // Use the list from the provider
                                 // Convert DeviceInfo back to Map for removal function if needed
                                 final deviceData = {
                                   'ip': device.ip,
-                                  'name': device.alias
+                                  'name': device.alias,
                                 };
                                 return ListTile(
                                   leading: const Icon(Icons.star),
                                   title: Text(device.alias),
                                   subtitle: Text('${device.ip}:${device.port}'),
                                   trailing: IconButton(
-                                    icon: const Icon(Icons.delete_outline,
-                                        color: Colors.red),
+                                    icon: const Icon(
+                                      Icons.delete_outline,
+                                      color: Colors.red,
+                                    ),
                                     tooltip: 'Remove Favorite',
                                     onPressed: () async {
                                       _log.info(
-                                          "Attempting to remove favorite with data: $deviceData"); // Use logger
+                                        "Attempting to remove favorite with data: $deviceData",
+                                      ); // Use logger
                                       final removedDeviceAlias = device.alias;
                                       // No need for mounted check here before await
                                       try {
@@ -1194,21 +1297,27 @@ class _HomePageState extends ConsumerState<HomePage> {
                                             .read(settingsProvider.notifier)
                                             .removeFavoriteDevice(deviceData);
                                         _log.info(
-                                            "Successfully called removeFavoriteDevice for: $deviceData"); // Use logger
+                                          "Successfully called removeFavoriteDevice for: $deviceData",
+                                        ); // Use logger
                                         if (!context.mounted) {
                                           return; // Check after await
                                         }
-                                        showCopyableSnackBar(context,
-                                            'Removed $removedDeviceAlias from favorites.');
+                                        showCopyableSnackBar(
+                                          context,
+                                          'Removed $removedDeviceAlias from favorites.',
+                                        );
                                       } catch (e) {
                                         _log.severe(
-                                            "Error calling removeFavoriteDevice",
-                                            e); // Use logger
+                                          "Error calling removeFavoriteDevice",
+                                          e,
+                                        ); // Use logger
                                         if (!context.mounted) {
                                           return; // Check after await (though technically before context use here)
                                         }
-                                        showCopyableSnackBar(context,
-                                            'Error removing favorite: $e');
+                                        showCopyableSnackBar(
+                                          context,
+                                          'Error removing favorite: $e',
+                                        );
                                       }
                                       // No need for setDialogState
                                     },
@@ -1268,8 +1377,8 @@ class _HomePageState extends ConsumerState<HomePage> {
       }
       if (permissionsToRequest.isNotEmpty) {
         if (!mounted) return;
-        Map<Permission, PermissionStatus> statuses =
-            await permissionsToRequest.request();
+        Map<Permission, PermissionStatus> statuses = await permissionsToRequest
+            .request();
         if (!mounted) return;
         permissionGranted = statuses.values.every((status) => status.isGranted);
         if (!permissionGranted) {
@@ -1303,7 +1412,9 @@ class _HomePageState extends ConsumerState<HomePage> {
     if (!permissionGranted) {
       // Use context directly here, guarded by the 'mounted' check above.
       showCopyableSnackBar(
-          context, '${permissionTypeDenied ?? 'Required'} permission denied');
+        context,
+        '${permissionTypeDenied ?? 'Required'} permission denied',
+      );
       return;
     }
 
@@ -1328,15 +1439,18 @@ class _HomePageState extends ConsumerState<HomePage> {
       if (result != null && result.files.isNotEmpty) {
         PlatformFile file = result.files.single;
         _log.info(
-            'FilePicker result on native: Name: ${file.name}, Path: ${file.path}, Bytes: ${file.bytes?.length}'); // Use logger
+          'FilePicker result on native: Name: ${file.name}, Path: ${file.path}, Bytes: ${file.bytes?.length}',
+        ); // Use logger
         final String fileName = file.name;
         final Uint8List? fileBytes = file.bytes;
         final String? filePath = file.path;
         final bool isDetectedImage = _isImageFileName(fileName);
         final bool isDetectedVideo = _isVideoFileName(fileName);
-        final bool shouldHandleAsImage = fileType == FileType.image ||
+        final bool shouldHandleAsImage =
+            fileType == FileType.image ||
             (fileType == FileType.any && isDetectedImage);
-        final bool shouldHandleAsVideo = fileType == FileType.video ||
+        final bool shouldHandleAsVideo =
+            fileType == FileType.video ||
             (fileType == FileType.any && isDetectedVideo);
 
         if (shouldHandleAsImage && (fileBytes != null || filePath != null)) {
@@ -1346,8 +1460,9 @@ class _HomePageState extends ConsumerState<HomePage> {
             builder: (BuildContext dialogContext) {
               return AlertDialog(
                 title: const Text('Send Photo'),
-                content:
-                    const Text('Do you want to edit the photo before sending?'),
+                content: const Text(
+                  'Do you want to edit the photo before sending?',
+                ),
                 actions: <Widget>[
                   TextButton(
                     child: const Text('Edit Photo'),
@@ -1355,7 +1470,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                       Navigator.of(dialogContext).pop();
                       if (!mounted) return;
                       _navigateToEditor(
-                          bytes: fileBytes, path: filePath, fileName: fileName);
+                        bytes: fileBytes,
+                        path: filePath,
+                        fileName: fileName,
+                      );
                     },
                   ),
                   TextButton(
@@ -1364,7 +1482,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                       Navigator.of(dialogContext).pop();
                       if (!mounted) return;
                       _setPickedFile(
-                          bytes: fileBytes, path: filePath, name: fileName);
+                        bytes: fileBytes,
+                        path: filePath,
+                        name: fileName,
+                      );
                     },
                   ),
                 ],
@@ -1379,17 +1500,19 @@ class _HomePageState extends ConsumerState<HomePage> {
             builder: (BuildContext dialogContext) {
               return AlertDialog(
                 title: const Text('Send Video'),
-                content:
-                    const Text('Do you want to edit the video before sending?'),
+                content: const Text(
+                  'Do you want to edit the video before sending?',
+                ),
                 actions: <Widget>[
                   TextButton(
                     onPressed: () {
                       Navigator.of(dialogContext).pop();
                       if (!mounted) return;
                       _navigateToVideoEditor(
-                          bytes: filePath == null ? fileBytes : null,
-                          path: filePath,
-                          fileName: fileName);
+                        bytes: filePath == null ? fileBytes : null,
+                        path: filePath,
+                        fileName: fileName,
+                      );
                     },
                     child: const Text('Edit Video'),
                   ),
@@ -1399,9 +1522,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                       Navigator.of(dialogContext).pop();
                       if (!mounted) return;
                       _setPickedFile(
-                          bytes: filePath == null ? fileBytes : null,
-                          path: filePath,
-                          name: fileName);
+                        bytes: filePath == null ? fileBytes : null,
+                        path: filePath,
+                        name: fileName,
+                      );
                     },
                   ),
                 ],
@@ -1414,7 +1538,8 @@ class _HomePageState extends ConsumerState<HomePage> {
           _setPickedFile(bytes: null, path: filePath, name: fileName);
         } else {
           _log.warning(
-              'File picking failed: No bytes or path available.'); // Use logger
+            'File picking failed: No bytes or path available.',
+          ); // Use logger
           if (!mounted) return;
           showCopyableSnackBar(context, 'Failed to access selected file.');
         }
@@ -1431,8 +1556,11 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
-  Future<void> _navigateToEditor(
-      {Uint8List? bytes, String? path, required String fileName}) async {
+  Future<void> _navigateToEditor({
+    Uint8List? bytes,
+    String? path,
+    required String fileName,
+  }) async {
     Uint8List? imageBytes = bytes;
     if (imageBytes == null && path != null) {
       try {
@@ -1449,7 +1577,9 @@ class _HomePageState extends ConsumerState<HomePage> {
     // No await before this context use
     if (imageBytes == null) {
       showCopyableSnackBar(
-          context, 'Cannot edit photo: No image data available.');
+        context,
+        'Cannot edit photo: No image data available.',
+      );
       return;
     }
     if (!mounted) return;
@@ -1460,7 +1590,8 @@ class _HomePageState extends ConsumerState<HomePage> {
     if (!mounted) return;
     if (editedImageBytes != null) {
       _log.info(
-          'Image editing complete. Got ${editedImageBytes.length} bytes.'); // Use logger
+        'Image editing complete. Got ${editedImageBytes.length} bytes.',
+      ); // Use logger
       final editedFileName = 'edited_$fileName';
       _setPickedFile(bytes: editedImageBytes, path: null, name: editedFileName);
     } else {
@@ -1475,13 +1606,19 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
-  Future<void> _navigateToVideoEditor(
-      {Uint8List? bytes, String? path, required String fileName}) async {
+  Future<void> _navigateToVideoEditor({
+    Uint8List? bytes,
+    String? path,
+    required String fileName,
+  }) async {
     if (!Platform.isAndroid && !Platform.isIOS) {
       _log.warning(
-          'Video editing is currently only supported on Android and iOS.');
-      showCopyableSnackBar(context,
-          'Video editing is currently only supported on Android and iOS.');
+        'Video editing is currently only supported on Android and iOS.',
+      );
+      showCopyableSnackBar(
+        context,
+        'Video editing is currently only supported on Android and iOS.',
+      );
       return;
     }
 
@@ -1501,10 +1638,13 @@ class _HomePageState extends ConsumerState<HomePage> {
         await tempFile.writeAsBytes(bytes);
         videoPath = tempFile.path;
         _log.info(
-            'Saved video bytes to temporary file: $videoPath'); // Use logger
+          'Saved video bytes to temporary file: $videoPath',
+        ); // Use logger
       } catch (e) {
         _log.severe(
-            'Error saving video bytes to temporary file', e); // Use logger
+          'Error saving video bytes to temporary file',
+          e,
+        ); // Use logger
         if (!mounted) return; // Check after await
         showCopyableSnackBar(context, 'Error preparing video for editing: $e');
         // Ensure _isSending is reset on error before returning
@@ -1518,7 +1658,9 @@ class _HomePageState extends ConsumerState<HomePage> {
     // No await before this context use
     if (videoPath == null) {
       showCopyableSnackBar(
-          context, 'Cannot edit video: No video file path available.');
+        context,
+        'Cannot edit video: No video file path available.',
+      );
       setState(() {
         _isSending = false;
       }); // Reset sending state
@@ -1530,7 +1672,8 @@ class _HomePageState extends ConsumerState<HomePage> {
     final ExportConfig? exportConfig = await Navigator.push<ExportConfig?>(
       context,
       MaterialPageRoute(
-          builder: (context) => VideoEditorScreen(file: videoFile)),
+        builder: (context) => VideoEditorScreen(file: videoFile),
+      ),
     );
 
     // Handle temp file deletion after navigation completes
@@ -1538,7 +1681,8 @@ class _HomePageState extends ConsumerState<HomePage> {
       try {
         await tempFile.delete();
         _log.info(
-            'Deleted temporary video file: ${tempFile.path}'); // Use logger
+          'Deleted temporary video file: ${tempFile.path}',
+        ); // Use logger
       } catch (e) {
         _log.warning('Error deleting temporary video file', e); // Use logger
         // Decide if this error needs user notification
@@ -1578,24 +1722,31 @@ class _HomePageState extends ConsumerState<HomePage> {
     ref.read(deviceSelectionProvider.notifier).clearSelection();
     _hasShownLongPressMultiSelectHint = false;
     _log.info(
-        'Selected file: $name ${bytes != null ? "(from bytes)" : "(from path)"}'); // Use logger
+      'Selected file: $name ${bytes != null ? "(from bytes)" : "(from path)"}',
+    ); // Use logger
     if (!mounted) return; // Check before using context
-    showCopyableSnackBar(context,
-        'Selected: $name. Tap a device to send. Long press to multi-select devices.');
+    showCopyableSnackBar(
+      context,
+      'Selected: $name. Tap a device to send. Long press to multi-select devices.',
+    );
   }
 
   Future<void> _scanQrCode() async {
     if (!mounted) return;
     if (Platform.isWindows) {
       showCopyableSnackBar(
-          context, 'QR Code scanning via camera is not supported on Windows.');
+        context,
+        'QR Code scanning via camera is not supported on Windows.',
+      );
       return;
     }
     try {
       if (!mounted) return;
       final currentContext = context;
-      final String? scanResult = await Navigator.push<String>(currentContext,
-          MaterialPageRoute(builder: (context) => const QrScannerPage()));
+      final String? scanResult = await Navigator.push<String>(
+        currentContext,
+        MaterialPageRoute(builder: (context) => const QrScannerPage()),
+      );
       if (!mounted) return; // Check after await
       if (scanResult == null) {
         _log.info('QR Code scan cancelled or failed.'); // Use logger
@@ -1613,9 +1764,10 @@ class _HomePageState extends ConsumerState<HomePage> {
         if (ip != null && alias != null) {
           // Port might be optional or fixed
           final scannedDevice = DeviceInfo(
-              ip: ip,
-              port: port ?? 2706,
-              alias: alias); // Use default port if missing
+            ip: ip,
+            port: port ?? 2706,
+            alias: alias,
+          ); // Use default port if missing
           final deviceData = {'ip': ip, 'name': alias}; // Data for provider
           if (!mounted) return;
           showDialog(
@@ -1623,7 +1775,8 @@ class _HomePageState extends ConsumerState<HomePage> {
             builder: (context) => AlertDialog(
               title: Text('Device Found: ${scannedDevice.alias}'),
               content: Text(
-                  'IP: ${scannedDevice.ip}:${scannedDevice.port}\n\nSend current selection or add to favorites?'),
+                'IP: ${scannedDevice.ip}:${scannedDevice.port}\n\nSend current selection or add to favorites?',
+              ),
               actions: [
                 TextButton(
                   child: const Text('Add Favorite'),
@@ -1637,8 +1790,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                         .addFavoriteDevice(deviceData);
                     if (!mounted) return; // Check after await
                     if (!currentContext.mounted) return;
-                    showCopyableSnackBar(currentContext,
-                        'Added ${scannedDevice.alias} to favorites.');
+                    showCopyableSnackBar(
+                      currentContext,
+                      'Added ${scannedDevice.alias} to favorites.',
+                    );
                   },
                 ),
                 TextButton(
@@ -1649,20 +1804,24 @@ class _HomePageState extends ConsumerState<HomePage> {
                   },
                 ),
                 TextButton(
-                    child: const Text('Cancel'),
-                    onPressed: () => Navigator.of(context).pop()),
+                  child: const Text('Cancel'),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
               ],
             ),
           );
         } else {
           throw const FormatException(
-              'Invalid QR code data format (missing ip, port, or alias).');
+            'Invalid QR code data format (missing ip, port, or alias).',
+          );
         }
       } catch (e) {
         _log.severe('Error processing scanned QR code', e); // Use logger
         if (!mounted) return; // Check before context use
         showCopyableSnackBar(
-            context, 'Invalid QR data. Scanned: "$_scanResult"');
+          context,
+          'Invalid QR data. Scanned: "$_scanResult"',
+        );
       }
     } catch (e) {
       _log.severe('Error during QR scan or processing', e); // Use logger

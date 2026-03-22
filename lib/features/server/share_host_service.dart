@@ -65,38 +65,44 @@ class ShareHostService {
 
     final normalizedMimeType = shareFile.mimeType.toLowerCase();
     final lowerName = shareFile.fileName.toLowerCase();
-    final showImagePreview = normalizedMimeType.startsWith('image/') ||
-      lowerName.endsWith('.jpg') ||
-      lowerName.endsWith('.jpeg') ||
-      lowerName.endsWith('.png') ||
-      lowerName.endsWith('.gif') ||
-      lowerName.endsWith('.bmp') ||
-      lowerName.endsWith('.webp') ||
-      lowerName.endsWith('.heic') ||
-      lowerName.endsWith('.heif');
-    final showVideoPreview = normalizedMimeType.startsWith('video/') ||
-      lowerName.endsWith('.mp4') ||
-      lowerName.endsWith('.mov') ||
-      lowerName.endsWith('.m4v') ||
-      lowerName.endsWith('.webm') ||
-      lowerName.endsWith('.avi') ||
-      lowerName.endsWith('.mkv') ||
-      lowerName.endsWith('.wmv');
+    final showImagePreview =
+        normalizedMimeType.startsWith('image/') ||
+        lowerName.endsWith('.jpg') ||
+        lowerName.endsWith('.jpeg') ||
+        lowerName.endsWith('.png') ||
+        lowerName.endsWith('.gif') ||
+        lowerName.endsWith('.bmp') ||
+        lowerName.endsWith('.webp') ||
+        lowerName.endsWith('.heic') ||
+        lowerName.endsWith('.heif');
+    final showVideoPreview =
+        normalizedMimeType.startsWith('video/') ||
+        lowerName.endsWith('.mp4') ||
+        lowerName.endsWith('.mov') ||
+        lowerName.endsWith('.m4v') ||
+        lowerName.endsWith('.webm') ||
+        lowerName.endsWith('.avi') ||
+        lowerName.endsWith('.mkv') ||
+        lowerName.endsWith('.wmv');
     final rawSharedText = shareFile.sharedText?.trim();
     final webLinkUrl = _extractWebLink(rawSharedText);
 
-    final fileName =
-        const HtmlEscape(HtmlEscapeMode.element).convert(shareFile.fileName);
-    final mimeType =
-        const HtmlEscape(HtmlEscapeMode.element).convert(shareFile.mimeType);
+    final fileName = const HtmlEscape(
+      HtmlEscapeMode.element,
+    ).convert(shareFile.fileName);
+    final mimeType = const HtmlEscape(
+      HtmlEscapeMode.element,
+    ).convert(shareFile.mimeType);
     final senderAlias = shareFile.senderAlias == null
         ? null
-        : const HtmlEscape(HtmlEscapeMode.element)
-            .convert(shareFile.senderAlias!);
+        : const HtmlEscape(
+            HtmlEscapeMode.element,
+          ).convert(shareFile.senderAlias!);
     final sharedText = shareFile.sharedText == null
         ? null
-        : const HtmlEscape(HtmlEscapeMode.element)
-            .convert(shareFile.sharedText!);
+        : const HtmlEscape(
+            HtmlEscapeMode.element,
+          ).convert(shareFile.sharedText!);
     final fileSize = _formatSize(shareFile.fileSize);
 
     final html = buildSharePageHtml(
