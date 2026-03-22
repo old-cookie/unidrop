@@ -14,11 +14,8 @@ import 'package:unidrop/pages/web_video_editor_page.dart';
 import 'package:unidrop/widgets/copyable_error_snackbar.dart';
 
 class _TargetEntry {
-  _TargetEntry({
-    required this.alias,
-    required this.ip,
-    required this.port,
-  }) : selected = true;
+  _TargetEntry({required this.alias, required this.ip, required this.port})
+    : selected = true;
 
   final String alias;
   final String ip;
@@ -66,8 +63,9 @@ class _WebSendPageState extends ConsumerState<WebSendPage> {
     final inputAlias = _aliasController.text.trim();
     final ip = _ipController.text.trim();
     final port = _defaultPort;
-    final alias =
-        inputAlias.isEmpty ? 'Device ${_targets.length + 1}' : inputAlias;
+    final alias = inputAlias.isEmpty
+        ? 'Device ${_targets.length + 1}'
+        : inputAlias;
 
     if (ip.isEmpty) {
       showCopyableSnackBar(context, 'Please enter valid IP.');
@@ -80,8 +78,9 @@ class _WebSendPageState extends ConsumerState<WebSendPage> {
       return;
     }
 
-    final duplicate =
-        _targets.any((target) => target.ip == ip && target.port == port);
+    final duplicate = _targets.any(
+      (target) => target.ip == ip && target.port == port,
+    );
     if (duplicate) {
       showCopyableSnackBar(context, 'Target already exists.');
       return;
@@ -148,11 +147,13 @@ class _WebSendPageState extends ConsumerState<WebSendPage> {
     final prefs = await SharedPreferences.getInstance();
     final encoded = jsonEncode(
       _targets
-          .map((target) => {
-                'alias': target.alias,
-                'ip': target.ip,
-                'port': target.port,
-              })
+          .map(
+            (target) => {
+              'alias': target.alias,
+              'ip': target.ip,
+              'port': target.port,
+            },
+          )
           .toList(growable: false),
     );
     await prefs.setString(_storageKey, encoded);
@@ -171,9 +172,7 @@ class _WebSendPageState extends ConsumerState<WebSendPage> {
 
   Future<void> _pickFile() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
-        withData: true,
-      );
+      final result = await FilePicker.platform.pickFiles(withData: true);
 
       if (!mounted || result == null || result.files.isEmpty) return;
 
@@ -323,22 +322,25 @@ class _WebSendPageState extends ConsumerState<WebSendPage> {
 
     if (!hasFile && textToSend.isEmpty) {
       showCopyableSnackBar(
-          context, 'Please select a file or enter text first.');
+        context,
+        'Please select a file or enter text first.',
+      );
       return false;
     }
 
     try {
       if (hasFile) {
-        await ref.read(sendServiceProvider).sendFile(
+        await ref
+            .read(sendServiceProvider)
+            .sendFile(
               target.toDeviceInfo(),
               _selectedFileName!,
               fileBytes: _selectedFileBytes,
             );
       } else {
-        await ref.read(sendServiceProvider).sendText(
-              target.toDeviceInfo(),
-              textToSend,
-            );
+        await ref
+            .read(sendServiceProvider)
+            .sendText(target.toDeviceInfo(), textToSend);
       }
       return true;
     } catch (e) {
@@ -353,7 +355,9 @@ class _WebSendPageState extends ConsumerState<WebSendPage> {
         return true;
       }
       showCopyableSnackBar(
-          context, 'Failed ${target.alias} (${target.ip}:${target.port}): $e');
+        context,
+        'Failed ${target.alias} (${target.ip}:${target.port}): $e',
+      );
       return false;
     }
   }
@@ -364,12 +368,15 @@ class _WebSendPageState extends ConsumerState<WebSendPage> {
     final textToSend = _textController.text.trim();
     if (!hasFile && textToSend.isEmpty) {
       showCopyableSnackBar(
-          context, 'Please select a file or enter text first.');
+        context,
+        'Please select a file or enter text first.',
+      );
       return;
     }
 
-    final selectedTargets =
-        _targets.where((target) => target.selected).toList();
+    final selectedTargets = _targets
+        .where((target) => target.selected)
+        .toList();
     if (selectedTargets.isEmpty) {
       showCopyableSnackBar(context, 'Please select at least one target.');
       return;
@@ -477,17 +484,19 @@ class _WebSendPageState extends ConsumerState<WebSendPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('UniDrop Web Sender'),
-      ),
+      appBar: AppBar(title: const Text('UniDrop Web Sender')),
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final double listHeight =
-              (constraints.maxHeight - 320).clamp(180.0, 420.0);
-          final double minContentWidth =
-              constraints.maxWidth >= 720 ? 720.0 : constraints.maxWidth;
-          final double minContentHeight =
-              constraints.maxHeight >= 560 ? 560.0 : constraints.maxHeight;
+          final double listHeight = (constraints.maxHeight - 320).clamp(
+            180.0,
+            420.0,
+          );
+          final double minContentWidth = constraints.maxWidth >= 720
+              ? 720.0
+              : constraints.maxWidth;
+          final double minContentHeight = constraints.maxHeight >= 560
+              ? 560.0
+              : constraints.maxHeight;
           return SingleChildScrollView(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -502,8 +511,10 @@ class _WebSendPageState extends ConsumerState<WebSendPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text('Manual Targets',
-                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Text(
+                        'Manual Targets',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       const SizedBox(height: 8),
                       Wrap(
                         spacing: 8,
@@ -581,7 +592,8 @@ class _WebSendPageState extends ConsumerState<WebSendPage> {
                                     width: 16,
                                     height: 16,
                                     child: CircularProgressIndicator(
-                                        strokeWidth: 2),
+                                      strokeWidth: 2,
+                                    ),
                                   )
                                 : const Icon(Icons.send),
                             label: const Text('Send File/Text to Selected'),
@@ -595,8 +607,10 @@ class _WebSendPageState extends ConsumerState<WebSendPage> {
                         height: listHeight,
                         child: _targets.isEmpty
                             ? const Center(
-                                child:
-                                    Text('No targets yet. Add a target above.'))
+                                child: Text(
+                                  'No targets yet. Add a target above.',
+                                ),
+                              )
                             : ListView.builder(
                                 itemCount: _targets.length,
                                 itemBuilder: (context, index) {
@@ -611,8 +625,9 @@ class _WebSendPageState extends ConsumerState<WebSendPage> {
                                             });
                                           },
                                     title: Text(target.alias),
-                                    subtitle:
-                                        Text('${target.ip}:${target.port}'),
+                                    subtitle: Text(
+                                      '${target.ip}:${target.port}',
+                                    ),
                                     secondary: IconButton(
                                       icon: const Icon(Icons.delete),
                                       onPressed: _isSending

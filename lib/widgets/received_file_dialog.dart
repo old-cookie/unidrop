@@ -69,9 +69,8 @@ class _ReceivedFileDialogState extends ConsumerState<ReceivedFileDialog> {
           child: Image.file(
             File(widget.fileInfo.path),
             fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) => const Center(
-              child: Text('Preview unavailable'),
-            ),
+            errorBuilder: (_, __, ___) =>
+                const Center(child: Text('Preview unavailable')),
           ),
         ),
       );
@@ -129,13 +128,17 @@ class _ReceivedFileDialogState extends ConsumerState<ReceivedFileDialog> {
         _logger.info('File deleted: ${widget.fileInfo.path}');
         if (context.mounted) {
           showCopyableSnackBar(
-              context, 'File "${widget.fileInfo.filename}" deleted.');
+            context,
+            'File "${widget.fileInfo.filename}" deleted.',
+          );
         }
       } else {
         _logger.warning('File not found for deletion: ${widget.fileInfo.path}');
         if (context.mounted) {
           showCopyableSnackBar(
-              context, 'File "${widget.fileInfo.filename}" not found.');
+            context,
+            'File "${widget.fileInfo.filename}" not found.',
+          );
         }
       }
     } catch (e) {
@@ -160,7 +163,8 @@ class _ReceivedFileDialogState extends ConsumerState<ReceivedFileDialog> {
     final navigator = Navigator.of(context);
     try {
       _logger.info(
-          'Native platform detected. Keep action for ${widget.fileInfo.filename}');
+        'Native platform detected. Keep action for ${widget.fileInfo.filename}',
+      );
       message = Platform.isWindows
           ? 'File "${widget.fileInfo.filename}" saved to Downloads.'
           : 'File "${widget.fileInfo.filename}" kept in temporary location.'; // Default message
@@ -168,13 +172,15 @@ class _ReceivedFileDialogState extends ConsumerState<ReceivedFileDialog> {
           (_mimeType!.startsWith('image/') ||
               _mimeType!.startsWith('video/'))) {
         _logger.info(
-            'Attempting to save ${widget.fileInfo.filename} to gallery...');
+          'Attempting to save ${widget.fileInfo.filename} to gallery...',
+        );
         if (Platform.isWindows) {
           message =
               '${_mimeType!.startsWith('image/') ? 'Photo' : 'Video'} "${widget.fileInfo.filename}" saved to Downloads.';
         } else {
-          final result =
-              await ImageGallerySaverPlus.saveFile(widget.fileInfo.path);
+          final result = await ImageGallerySaverPlus.saveFile(
+            widget.fileInfo.path,
+          );
           _logger.info('Gallery save result: $result');
           if (result != null && result['isSuccess'] == true) {
             message =
@@ -184,12 +190,14 @@ class _ReceivedFileDialogState extends ConsumerState<ReceivedFileDialog> {
             message =
                 'Failed to save "${widget.fileInfo.filename}" to gallery. Kept in temporary location.';
             _logger.warning(
-                'Gallery save failed or returned unexpected result: $result');
+              'Gallery save failed or returned unexpected result: $result',
+            );
           }
         }
       } else {
         _logger.info(
-            'File type ($_mimeType) is not an image or video. Keeping in temporary location.');
+          'File type ($_mimeType) is not an image or video. Keeping in temporary location.',
+        );
       }
       if (deleteOriginal) {
         try {
@@ -200,12 +208,16 @@ class _ReceivedFileDialogState extends ConsumerState<ReceivedFileDialog> {
           }
         } catch (e) {
           _logger.severe(
-              'Error deleting temporary file ${widget.fileInfo.path}', e);
+            'Error deleting temporary file ${widget.fileInfo.path}',
+            e,
+          );
         }
       }
     } catch (e) {
       _logger.severe(
-          'Error during keep/save operation for ${widget.fileInfo.path}', e);
+        'Error during keep/save operation for ${widget.fileInfo.path}',
+        e,
+      );
       message = 'Error processing file: $e.';
     } finally {
       ref.read(receivedFileProvider.notifier).clearReceivedFile();
@@ -241,9 +253,13 @@ class _ReceivedFileDialogState extends ConsumerState<ReceivedFileDialog> {
       ),
       actions: <Widget>[
         TextButton(
-            child: const Text('Delete'), onPressed: () => _deleteFile(context)),
+          child: const Text('Delete'),
+          onPressed: () => _deleteFile(context),
+        ),
         TextButton(
-            child: const Text('Keep'), onPressed: () => _keepFile(context)),
+          child: const Text('Keep'),
+          onPressed: () => _keepFile(context),
+        ),
       ],
     );
   }

@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -18,7 +17,6 @@ import 'package:unidrop/widgets/received_file_dialog.dart';
 import 'package:unidrop/widgets/received_text_dialog.dart';
 import 'package:unidrop/models/received_file_info.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'dart:convert';
 import 'package:image_editor_plus/image_editor_plus.dart';
 import 'package:unidrop/pages/video_editor_page.dart';
 import 'package:path_provider/path_provider.dart';
