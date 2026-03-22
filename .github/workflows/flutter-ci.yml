@@ -87,6 +87,30 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Remove pro_video_editor for Linux build
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - << 'PY'
+          import json
+          from pathlib import Path
+
+          file = Path('.flutter-plugins-dependencies')
+          if not file.exists():
+              raise SystemExit('Missing .flutter-plugins-dependencies')
+
+          data = json.loads(file.read_text(encoding='utf-8'))
+          plugins = data.get('plugins', {})
+          linux_plugins = plugins.get('linux', [])
+          filtered = [p for p in linux_plugins if p.get('name') != 'pro_video_editor']
+          plugins['linux'] = filtered
+          data['plugins'] = plugins
+          file.write_text(json.dumps(data, separators=(',', ':')), encoding='utf-8')
+          print('Removed pro_video_editor from linux plugin list')
+          PY
+
+          rm -rf flutter/ephemeral/.plugin_symlinks/pro_video_editor || true
+
       - name: Build Linux release
         run: flutter build linux --release
 
