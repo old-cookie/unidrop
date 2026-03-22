@@ -101,12 +101,10 @@ jobs:
             upgradeCode = ""
             arch = "x64"
             includeLicenseAgreement = $false
-            files = @(
-              @{
-                source = "application/*"
-                target = "ProgramFilesFolder"
-              }
-            )
+            files = @{
+              source = "application/*"
+              target = "ProgramFilesFolder"
+            }
           }
           $wixConfig | ConvertTo-Json -Depth 10 | Out-File -FilePath "wix.json" -Encoding UTF8
 
