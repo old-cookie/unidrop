@@ -109,13 +109,17 @@ jobs:
           print('Removed pro_video_editor from linux plugin list')
           PY
 
+          rm -rf linux/flutter/ephemeral/.plugin_symlinks/pro_video_editor || true
           rm -rf flutter/ephemeral/.plugin_symlinks/pro_video_editor || true
 
       - name: Fallback patch pro_video_editor Linux CMake
         shell: bash
         run: |
           set -euo pipefail
-          PLUGIN_CMAKE="flutter/ephemeral/.plugin_symlinks/pro_video_editor/linux/CMakeLists.txt"
+          PLUGIN_CMAKE="linux/flutter/ephemeral/.plugin_symlinks/pro_video_editor/linux/CMakeLists.txt"
+          if [ ! -f "$PLUGIN_CMAKE" ]; then
+            PLUGIN_CMAKE="flutter/ephemeral/.plugin_symlinks/pro_video_editor/linux/CMakeLists.txt"
+          fi
           if [ -f "$PLUGIN_CMAKE" ]; then
             echo "pro_video_editor still present for linux, applying source extension patch"
             sed -i 's/src\/video_metadata\.cpp/src\/video_metadata.cc/g' "$PLUGIN_CMAKE"
