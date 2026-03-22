@@ -61,5 +61,9 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^6.0.0
 
+dependency_overrides:
+  pro_video_editor:
+    path: third_party/pro_video_editor
+
 flutter:
   uses-material-design: true
