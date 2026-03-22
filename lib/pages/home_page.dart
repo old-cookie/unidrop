@@ -27,9 +27,12 @@ import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'package:unidrop/providers/device_selection_provider.dart';
 import 'package:unidrop/providers/settings_provider.dart';
 import 'package:unidrop/features/server/server_provider.dart';
+import 'package:unidrop/features/server/share_link_provider.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:unidrop/pages/qr_scanner_page.dart';
+import 'package:unidrop/pages/share_link_page.dart';
 import 'package:logging/logging.dart'; // Import the logging package
+import 'package:mime/mime.dart';
 import 'package:unidrop/widgets/copyable_error_snackbar.dart';
 import 'package:unidrop/utils/ip_address_utils.dart';
 
@@ -443,6 +446,116 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
+  Future<void> _openShareLinkPage() async {
+    if (!mounted) return;
+    final textToShare = _textController.text.trim();
+    final hasSelectedFile = _selectedFileName != null &&
+        (_selectedFilePath != null || _selectedFileBytes != null);
+    if (!hasSelectedFile && textToShare.isEmpty) {
+      showCopyableSnackBar(context, 'Please select a file or enter text.');
+      return;
+    }
+
+    final resolvedIp = _localIpAddress ?? await _resolveLocalIpAddress();
+    if (!mounted) return;
+    if (resolvedIp == null || resolvedIp.isEmpty) {
+      showCopyableSnackBar(context, 'Cannot find local IP address.');
+      return;
+    }
+
+    if (_localIpAddress != resolvedIp) {
+      setState(() {
+        _localIpAddress = resolvedIp;
+      });
+    }
+
+    late final String fileName;
+    late final String mimeType;
+    String? sharedText;
+    String? filePath;
+    Uint8List? fileBytes;
+    int fileSize;
+
+    if (hasSelectedFile) {
+      fileName = _selectedFileName!;
+      filePath = _selectedFilePath;
+      fileBytes = filePath == null ? _selectedFileBytes : null;
+      if (fileBytes != null) {
+        fileSize = fileBytes.length;
+      } else {
+        try {
+          fileSize = await File(filePath!).length();
+        } catch (e) {
+          if (!mounted) return;
+          showCopyableSnackBar(context, 'Cannot access selected file: $e');
+          return;
+        }
+      }
+        final detectedMime =
+          lookupMimeType(filePath ?? fileName, headerBytes: fileBytes);
+        mimeType = _resolveShareMimeType(fileName, detectedMime);
+    } else {
+      fileName = 'unidrop_text_${DateTime.now().millisecondsSinceEpoch}.txt';
+      sharedText = textToShare;
+      fileBytes = Uint8List.fromList(utf8.encode(textToShare));
+      filePath = null;
+      fileSize = fileBytes.length;
+      mimeType = 'text/plain; charset=utf-8';
+    }
+
+    ref.read(shareFileProvider.notifier).setShareFile(
+          fileName: fileName,
+          mimeType: mimeType,
+          fileSize: fileSize,
+          senderAlias: ref.read(deviceAliasProvider).trim(),
+          filePath: filePath,
+          fileBytes: fileBytes,
+          sharedText: sharedText,
+        );
+
+    if (!mounted) return;
+    try {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ShareLinkPage(localIpAddress: resolvedIp),
+        ),
+      );
+    } finally {
+      ref.read(shareFileProvider.notifier).clear();
+    }
+  }
+
+  String _resolveShareMimeType(String fileName, String? detectedMime) {
+    if (detectedMime != null && detectedMime != 'application/octet-stream') {
+      return detectedMime;
+    }
+
+    final lower = fileName.toLowerCase();
+    if (lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.png') ||
+        lower.endsWith('.gif') ||
+        lower.endsWith('.bmp') ||
+        lower.endsWith('.webp') ||
+        lower.endsWith('.heic') ||
+        lower.endsWith('.heif')) {
+      return 'image/*';
+    }
+
+    if (lower.endsWith('.mp4') ||
+        lower.endsWith('.mov') ||
+        lower.endsWith('.m4v') ||
+        lower.endsWith('.webm') ||
+        lower.endsWith('.avi') ||
+        lower.endsWith('.mkv') ||
+        lower.endsWith('.wmv')) {
+      return 'video/*';
+    }
+
+    return detectedMime ?? 'application/octet-stream';
+  }
+
   Future<void> _manualRefreshDiscovery() async {
     if (!mounted) return;
     showCopyableSnackBar(context, 'Refreshing devices...');
@@ -812,6 +925,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                           child: TextField(
                             controller: _textController,
                             maxLines: null,
+                            onChanged: (_) {
+                              if (!mounted) return;
+                              setState(() {});
+                            },
                             onTapOutside: (_) =>
                                 FocusManager.instance.primaryFocus?.unfocus(),
                             decoration: const InputDecoration(
@@ -927,8 +1044,13 @@ class _HomePageState extends ConsumerState<HomePage> {
                     ElevatedButton.icon(
                       icon: const Icon(Icons.send),
                       label: const Text('Send'),
-                      onPressed: () {
+                      onPressed: () async {
                         if (!mounted) return;
+                        if (Platform.isWindows || Platform.isMacOS) {
+                          await _pickFile(context, FileType.any);
+                          return;
+                        }
+
                         showModalBottomSheet(
                           context: context,
                           builder: (BuildContext bc) {
@@ -976,6 +1098,13 @@ class _HomePageState extends ConsumerState<HomePage> {
                         onPressed: _isSending
                             ? null
                             : () => _handleBatchSend(groupedDiscoveredDevices),
+                      ),
+                    if (_selectedFileName != null ||
+                        _textController.text.trim().isNotEmpty)
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.link),
+                        label: const Text('Send with link'),
+                        onPressed: _isSending ? null : _openShareLinkPage,
                       ),
                   ],
                 ),
