@@ -118,7 +118,14 @@ jobs:
 
           wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool.AppImage
           chmod +x appimagetool.AppImage
-          APPIMAGETOOL_APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64 ./appimagetool.AppImage AppDir unidrop-x86_64.AppImage
+          if APPIMAGETOOL_APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64 ./appimagetool.AppImage AppDir unidrop-x86_64.AppImage; then
+            echo "AppImage built via extract-and-run env mode"
+          else
+            echo "Fallback: building AppImage via --appimage-extract (no FUSE)"
+            rm -rf squashfs-root
+            ./appimagetool.AppImage --appimage-extract
+            ARCH=x86_64 ./squashfs-root/AppRun AppDir unidrop-x86_64.AppImage
+          fi
 
       - name: Upload Linux AppImage artifact
         uses: actions/upload-artifact@v7
