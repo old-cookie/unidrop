@@ -93,17 +93,15 @@ jobs:
         shell: pwsh
         run: |
           $wixConfig = @{
-            productName = "UniDrop"
-            productVersion = "${{ steps.version.outputs.version }}"
-            companyName = "UniDrop"
-            projectUrl = ""
+            product = "UniDrop"
+            company = "UniDrop"
             license = ""
-            upgradeCode = ""
-            arch = "x64"
-            includeLicenseAgreement = $false
+            "upgrade-code" = ""
             files = @{
-              source = "application/*"
-              target = "ProgramFilesFolder"
+              guid = ""
+              items = @(
+                "application/*"
+              )
             }
           }
           $wixConfig | ConvertTo-Json -Depth 10 | Out-File -FilePath "wix.json" -Encoding UTF8
@@ -112,6 +110,7 @@ jobs:
         uses: AliceOh/CreateWindowsInstaller@1.0.0
         with:
           exefile: "flutter-build/windows/x64/runner/Release/unidrop.exe"
+          version: "${{ steps.version.outputs.version }}"
 
       - name: Upload Windows MSI artifact
         uses: actions/upload-artifact@v7
