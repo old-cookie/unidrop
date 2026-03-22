@@ -1,10 +1,10 @@
 name: unidrop
 description: UFCFS4-30-3 Creative Technologies Project.
 publish_to: "none"
-version: 3.2.0
+version: 4.0.0
 
 environment:
-  sdk: ">=3.0.0 <4.0.0"
+  sdk: "3.11.0"
 
 dependencies:
   flutter:
@@ -35,20 +35,20 @@ dependencies:
 
   # Device and security
   device_info_plus: ^12.3.0
-  encrypt_shared_preferences: ^0.9.9
+  encrypt_shared_preferences: ^1.0.1
   local_auth: ^3.0.1
   permission_handler: ^12.0.1
 
   # Media processing
-  fc_native_video_thumbnail: ^0.17.2
   image: ^4.5.4
   image_editor_plus: ^1.0.6
   image_gallery_saver_plus: ^4.0.1
   image_picker: ^1.0.7
-  pro_image_editor: ^9.9.0
+  pro_image_editor: ^12.0.0
   pro_video_editor: ^1.7.0
-  shared_preferences: ^2.5.3
+
   video_player: ^2.11.0
+  universal_file_previewer: ^0.3.0
 
   # Utilities
   basic_utils: ^5.7.0
@@ -62,3 +62,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+dependency_overrides:
+  universal_file_previewer:
+    path: third_party/universal_file_previewer

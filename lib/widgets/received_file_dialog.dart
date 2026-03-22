@@ -1,15 +1,13 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 import 'package:unidrop/features/receive/received_file_provider.dart';
 import 'package:unidrop/models/received_file_info.dart';
 import 'package:mime/mime.dart';
-import 'package:image/image.dart' as img;
-import 'package:fc_native_video_thumbnail/fc_native_video_thumbnail.dart';
 import 'package:logging/logging.dart';
 import 'package:unidrop/widgets/copyable_error_snackbar.dart';
+import 'package:universal_file_previewer/universal_file_previewer.dart';
 
 /// A dialog widget that displays received file information and provides options to keep or delete the file.
 /// Shows a thumbnail preview for images and videos, and handles file operations across different platforms.
@@ -26,78 +24,74 @@ class ReceivedFileDialog extends ConsumerStatefulWidget {
 
 class _ReceivedFileDialogState extends ConsumerState<ReceivedFileDialog> {
   static final _logger = Logger('ReceivedFileDialog');
-  bool _isLoadingThumbnail = true;
   String? _mimeType;
-  Uint8List? _thumbnailData;
+  FileType? _detectedType;
+
+  static const Map<String, List<String>> _supportedPreviewGroups = {
+    'Images': ['JPG', 'PNG', 'GIF', 'WEBP', 'BMP', 'SVG', 'HEIC', 'TIFF'],
+    'Video': ['MP4', 'MOV', 'AVI', 'MKV', 'WEBM'],
+    'Audio': ['MP3', 'WAV', 'AAC', 'FLAC', 'OGG'],
+    'Documents': ['PDF', 'DOCX', 'DOC', 'XLSX', 'XLS', 'PPTX', 'PPT'],
+    'Text / Data': ['TXT', 'MD', 'CSV', 'JSON', 'XML', 'HTML'],
+    'Code': ['DART', 'JS', 'TS', 'PY', 'JAVA', 'C/C++', 'GO', 'RUST'],
+    'Archive': ['ZIP', 'RAR', 'TAR', 'GZ', '7Z'],
+    '3D': ['GLB', 'GLTF', 'OBJ', 'STL'],
+  };
+
   @override
   void initState() {
     super.initState();
     _mimeType = lookupMimeType(widget.fileInfo.path);
-    _generateThumbnail();
   }
 
-  /// Generates a thumbnail for the received file if it's an image or video.
-  /// Updates the UI state during and after thumbnail generation.
-  /// Handles different file types and potential errors during generation.
-  Future<void> _generateThumbnail() async {
-    setState(() {
-      _isLoadingThumbnail = true;
-    });
-    Uint8List? data;
-    try {
-      if (_mimeType?.startsWith('image/') ?? false) {
-        final fileBytes = await File(widget.fileInfo.path).readAsBytes();
-        data = await _decodeAndResizeImage(fileBytes);
-        _logger
-            .info('Image thumbnail generated for ${widget.fileInfo.filename}');
-      } else if (_mimeType?.startsWith('video/') ?? false) {
-        final tempThumbPath =
-            '${Directory.systemTemp.path}${Platform.pathSeparator}received_thumb_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        final generated = await FcNativeVideoThumbnail().getVideoThumbnail(
-          srcFile: widget.fileInfo.path,
-          destFile: tempThumbPath,
-          width: 100,
-          height: 100,
-          format: 'jpeg',
-          quality: 75,
-        );
-        if (generated) {
-          final thumbFile = File(tempThumbPath);
-          if (await thumbFile.exists()) {
-            data = await thumbFile.readAsBytes();
-            await thumbFile.delete();
-          }
-        }
-        _logger
-            .info('Video thumbnail generated for ${widget.fileInfo.filename}');
-      } else {
-        _logger.info(
-            'Thumbnail generation not supported for MIME type: $_mimeType');
-      }
-    } catch (e) {
-      _logger.severe(
-          'Error generating thumbnail for ${widget.fileInfo.filename}', e);
-      data = null;
-    } finally {
-      if (mounted) {
-        setState(() {
-          _thumbnailData = data;
-          _isLoadingThumbnail = false;
-        });
-      }
-    }
+  Widget _buildFilePreview() {
+    return SizedBox(
+      height: 220,
+      width: 320,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: FilePreviewWidget(
+          file: File(widget.fileInfo.path),
+          config: PreviewConfig(
+            showToolbar: false,
+            showFileInfo: false,
+            errorBuilder: (error) => Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Icon(Icons.insert_drive_file, size: 50, color: Colors.grey),
+                  SizedBox(height: 8),
+                  Text('Preview unavailable'),
+                ],
+              ),
+            ),
+          ),
+          onTypeDetected: (type) {
+            if (!mounted || _detectedType == type) {
+              return;
+            }
+            setState(() => _detectedType = type);
+          },
+        ),
+      ),
+    );
   }
 
-  /// Decodes and resizes an image from bytes to create a thumbnail.
-  /// [fileBytes] The raw bytes of the image file.
-  /// Returns a Uint8List containing the compressed thumbnail data, or null if processing fails.
-  static Future<Uint8List?> _decodeAndResizeImage(Uint8List fileBytes) async {
-    img.Image? image = img.decodeImage(fileBytes);
-    if (image != null) {
-      img.Image thumbnail = img.copyResize(image, width: 100);
-      return img.encodeJpg(thumbnail, quality: 85);
-    }
-    return null;
+  Widget _buildSupportedFormats() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: _supportedPreviewGroups.entries
+          .map(
+            (entry) => Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text(
+                '${entry.key}: ${entry.value.join(', ')}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+          )
+          .toList(),
+    );
   }
 
   /// Deletes the received file from the file system.
@@ -202,32 +196,31 @@ class _ReceivedFileDialogState extends ConsumerState<ReceivedFileDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('File Received'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            height: 100,
-            width: 100,
-            child: _isLoadingThumbnail
-                ? const Center(child: CircularProgressIndicator())
-                : _thumbnailData != null
-                    ? Image.memory(
-                        _thumbnailData!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) =>
-                            const Center(
-                                child: Icon(Icons.error_outline,
-                                    size: 50, color: Colors.red)),
-                      )
-                    : const Center(
-                        child: Icon(Icons.insert_drive_file,
-                            size: 50, color: Colors.grey)),
-          ),
-          const SizedBox(height: 16),
-          Text(
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(child: _buildFilePreview()),
+            const SizedBox(height: 12),
+            Text(
+              'Detected type: ${_detectedType?.label ?? 'Detecting...'}',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 12),
+            Text(
               'Received file: "${widget.fileInfo.filename}".\nKeep it or delete it?',
-              textAlign: TextAlign.center),
-        ],
+              textAlign: TextAlign.left,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Universal preview supports:',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 6),
+            _buildSupportedFormats(),
+          ],
+        ),
       ),
       actions: <Widget>[
         TextButton(

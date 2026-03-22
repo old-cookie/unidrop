@@ -21,7 +21,7 @@ import 'package:image_editor_plus/image_editor_plus.dart';
 import 'package:unidrop/pages/video_editor_page.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:async';
-import 'package:fc_native_video_thumbnail/fc_native_video_thumbnail.dart';
+import 'package:universal_file_previewer/src/platform/platform_channel.dart';
 import 'package:unidrop/pages/settings_page.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'package:unidrop/providers/device_selection_provider.dart';
@@ -201,26 +201,7 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   Future<Uint8List?> _generateVideoThumbnailData(String videoPath,
       {int maxWidth = 150, int quality = 25}) async {
-    final tempFile = File(
-        '${Directory.systemTemp.path}${Platform.pathSeparator}thumb_${DateTime.now().millisecondsSinceEpoch}.jpg');
-    try {
-      final generated = await FcNativeVideoThumbnail().getVideoThumbnail(
-        srcFile: videoPath,
-        destFile: tempFile.path,
-        width: maxWidth,
-        height: maxWidth,
-        format: 'jpeg',
-        quality: quality,
-      );
-      if (!generated || !await tempFile.exists()) {
-        return null;
-      }
-      return await tempFile.readAsBytes();
-    } finally {
-      if (await tempFile.exists()) {
-        await tempFile.delete();
-      }
-    }
+    return FilePreviewerChannel.generateVideoThumbnail(videoPath);
   }
 
   // Remove _loadFavorites and _saveFavorites - managed by SettingsNotifier

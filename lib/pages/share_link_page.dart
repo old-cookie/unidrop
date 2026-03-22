@@ -3,9 +3,9 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:fc_native_video_thumbnail/fc_native_video_thumbnail.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
+import 'package:universal_file_previewer/src/platform/platform_channel.dart';
 import 'package:unidrop/features/server/share_host_service.dart';
 import 'package:unidrop/features/server/share_link_provider.dart';
 import 'package:unidrop/utils/ip_address_utils.dart';
@@ -130,26 +130,7 @@ class _ShareLinkPageState extends ConsumerState<ShareLinkPage> {
 
   Future<Uint8List?> _generateVideoThumbnailData(String videoPath,
       {int maxWidth = 400, int quality = 40}) async {
-    final tempFile = File(
-        '${Directory.systemTemp.path}${Platform.pathSeparator}share_thumb_${DateTime.now().millisecondsSinceEpoch}.jpg');
-    try {
-      final generated = await FcNativeVideoThumbnail().getVideoThumbnail(
-        srcFile: videoPath,
-        destFile: tempFile.path,
-        width: maxWidth,
-        height: maxWidth,
-        format: 'jpeg',
-        quality: quality,
-      );
-      if (!generated || !await tempFile.exists()) {
-        return null;
-      }
-      return await tempFile.readAsBytes();
-    } finally {
-      if (await tempFile.exists()) {
-        await tempFile.delete();
-      }
-    }
+    return FilePreviewerChannel.generateVideoThumbnail(videoPath);
   }
 
   Future<Uint8List?> _generateVideoThumbnailFromBytes(Uint8List videoBytes,
