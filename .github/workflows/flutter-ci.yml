@@ -87,19 +87,6 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Patch broken pro_video_editor Linux plugin sources
-        shell: bash
-        run: |
-          set -euo pipefail
-          PLUGIN_CMAKE="flutter/ephemeral/.plugin_symlinks/pro_video_editor/linux/CMakeLists.txt"
-          if [ -f "$PLUGIN_CMAKE" ]; then
-            sed -i 's/src\/video_metadata\.cpp/src\/video_metadata.cc/g' "$PLUGIN_CMAKE"
-            sed -i 's/src\/thumbnail_generator\.cpp/src\/thumbnail_generator.cc/g' "$PLUGIN_CMAKE"
-            echo "Patched $PLUGIN_CMAKE"
-          else
-            echo "No pro_video_editor linux plugin CMakeLists found; skipping patch"
-          fi
-
       - name: Build Linux release
         run: flutter build linux --release
 

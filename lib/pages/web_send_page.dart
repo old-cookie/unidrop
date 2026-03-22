@@ -10,7 +10,6 @@ import 'package:image_editor_plus/image_editor_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unidrop/features/send/send_service.dart';
 import 'package:unidrop/models/device_info.dart';
-import 'package:unidrop/pages/web_video_editor_page.dart';
 import 'package:unidrop/widgets/copyable_error_snackbar.dart';
 
 class _TargetEntry {
@@ -298,22 +297,14 @@ class _WebSendPageState extends ConsumerState<WebSendPage> {
 
   Future<void> _editVideo(Uint8List bytes, String fileName) async {
     if (!mounted) return;
-    final editedBytes = await Navigator.push<Uint8List>(
+    showCopyableSnackBar(
       context,
-      MaterialPageRoute(
-        builder: (context) => WebVideoEditorPage(videoBytes: bytes),
-      ),
+      'Video editing is not supported on web and linux.',
     );
-    if (!mounted) return;
-    if (editedBytes == null || editedBytes.isEmpty) {
-      showCopyableSnackBar(context, 'Video editing cancelled.');
-      return;
-    }
     setState(() {
-      _selectedFileBytes = editedBytes;
-      _selectedFileName = 'edited_$fileName';
+      _selectedFileBytes = bytes;
+      _selectedFileName = fileName;
     });
-    showCopyableSnackBar(context, 'Edited video ready: edited_$fileName');
   }
 
   Future<bool> _sendToTarget(_TargetEntry target) async {
