@@ -53,6 +53,15 @@ jobs:
       - name: Flutter action
         uses: subosito/flutter-action@v2.22.0
 
+      - name: Pin fragile plugin versions for CI
+        shell: bash
+        run: |
+          cat > pubspec_overrides.yaml << 'EOF'
+          dependency_overrides:
+            pro_image_editor: 12.0.4
+            pro_video_editor: 1.7.0
+          EOF
+
       - name: Install dependencies
         run: flutter pub get
 
