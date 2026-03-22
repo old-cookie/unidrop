@@ -46,7 +46,7 @@ dependencies:
   image_gallery_saver_plus: ^4.0.1
   image_picker: ^1.0.7
   pro_image_editor: 12.0.4
-  pro_video_editor: ^1.7.0
+  pro_video_editor: 1.7.0
 
   cross_platform_video_thumbnails: ^0.1.1
   video_player: ^2.11.0
