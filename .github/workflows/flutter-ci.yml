@@ -58,16 +58,29 @@ jobs:
       - name: Build Windows release
         run: flutter build windows --release
 
+      - name: Prepare Flutter build output for MSI action
+        shell: pwsh
+        run: Move-Item -Path build -Destination flutter-build
+
       - name: Build Windows Installer MSI from exe file
         uses: AliceOh/CreateWindowsInstaller@1.0.0
         with:
-          exefile: "build/windows/x64/runner/Release/unidrop.exe"
+          exefile: "flutter-build/windows/x64/runner/Release/unidrop.exe"
+
+      - name: Upload Windows MSI artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-installer-msi
+          path: |
+            build/*.msi
+            *.msi
+          if-no-files-found: error
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v7
         with:
           name: windows-release-bundle
-          path: build/windows/x64/runner/Release/
+          path: flutter-build/windows/x64/runner/Release/
 
   linux-release:
     runs-on: ubuntu-latest
@@ -269,6 +282,9 @@ jobs:
           (cd dist/linux-release-bundle && zip -r ../../out/unidrop-linux-v${VERSION}.zip .)
           (cd dist/macos-release-bundle && zip -r ../../out/unidrop-macos-v${VERSION}.zip .)
           (cd dist/ios-release-runner-app && zip -r ../../out/unidrop-ios-v${VERSION}.zip .)
+          if ls dist/windows-installer-msi/*.msi >/dev/null 2>&1; then
+            cp dist/windows-installer-msi/*.msi out/
+          fi
           if [ -f dist/linux-appimage/unidrop-x86_64.AppImage ]; then
             cp dist/linux-appimage/unidrop-x86_64.AppImage out/unidrop-linux-appimage-v${VERSION}.AppImage
           fi
