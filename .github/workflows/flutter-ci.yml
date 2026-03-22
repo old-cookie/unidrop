@@ -92,6 +92,13 @@ jobs:
       - name: Create wix.json configuration
         shell: pwsh
         run: |
+          $fileItems = Get-ChildItem -Path "application" -Recurse -File | ForEach-Object {
+            $_.FullName.Replace((Get-Location).Path + "\", "").Replace("\", "/")
+          }
+          if (!$fileItems -or $fileItems.Count -eq 0) {
+            throw "No files found under application/ for wix.json files.items"
+          }
+
           $wixConfig = @{
             product = "UniDrop"
             company = "UniDrop"
@@ -99,9 +106,7 @@ jobs:
             "upgrade-code" = ""
             files = @{
               guid = ""
-              items = @(
-                "application/*"
-              )
+              items = $fileItems
             }
           }
           $wixConfig | ConvertTo-Json -Depth 10 | Out-File -FilePath "wix.json" -Encoding UTF8
