@@ -62,6 +62,21 @@ jobs:
         shell: pwsh
         run: Move-Item -Path build -Destination flutter-build
 
+      - name: Prepare application payload for MSI action
+        shell: pwsh
+        run: |
+          $releaseDir = "flutter-build/windows/x64/runner/Release"
+          if (!(Test-Path "$releaseDir/unidrop.exe")) {
+            throw "Expected executable not found: $releaseDir/unidrop.exe"
+          }
+          if (Test-Path "application") {
+            Remove-Item -Path "application" -Recurse -Force
+          }
+          New-Item -Path "application" -ItemType Directory | Out-Null
+          Get-ChildItem -Path $releaseDir | Where-Object { $_.Name -ne "unidrop.exe" } | ForEach-Object {
+            Copy-Item -Path $_.FullName -Destination "application" -Recurse -Force
+          }
+
       - name: Build Windows Installer MSI from exe file
         uses: AliceOh/CreateWindowsInstaller@1.0.0
         with:
@@ -283,7 +298,8 @@ jobs:
           (cd dist/macos-release-bundle && zip -r ../../out/unidrop-macos-v${VERSION}.zip .)
           (cd dist/ios-release-runner-app && zip -r ../../out/unidrop-ios-v${VERSION}.zip .)
           if ls dist/windows-installer-msi/*.msi >/dev/null 2>&1; then
-            cp dist/windows-installer-msi/*.msi out/
+            MSI_FILE=$(ls dist/windows-installer-msi/*.msi | head -n 1)
+            cp "$MSI_FILE" "out/unidrop-windows-installer-v${VERSION}.msi"
           fi
           if [ -f dist/linux-appimage/unidrop-x86_64.AppImage ]; then
             cp dist/linux-appimage/unidrop-x86_64.AppImage out/unidrop-linux-appimage-v${VERSION}.AppImage
