@@ -36,6 +36,23 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Patch pro_video_editor Linux sources in pub cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t cmake_files < <(find "$HOME/.pub-cache/hosted/pub.dev" -path "*/pro_video_editor-*/linux/CMakeLists.txt" -type f 2>/dev/null || true)
+          if [ "${#cmake_files[@]}" -eq 0 ]; then
+            echo "No pro_video_editor linux CMakeLists.txt found in pub cache"
+            exit 0
+          fi
+
+          for file in "${cmake_files[@]}"; do
+            echo "Patching $file"
+            sed -i 's/src\/video_metadata\.cpp/src\/video_metadata.cc/g' "$file"
+            sed -i 's/src\/thumbnail_generator\.cpp/src\/thumbnail_generator.cc/g' "$file"
+            grep -n 'video_metadata\|thumbnail_generator' "$file"
+          done
+
       - name: Build Android release
         run: flutter build apk --release
 
