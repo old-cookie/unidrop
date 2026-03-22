@@ -122,8 +122,8 @@ jobs:
         with:
           name: windows-installer-msi
           path: |
+            flutter-build/windows/x64/runner/Release/*.msi
             build/*.msi
-            *.msi
           if-no-files-found: error
 
       - name: Upload Windows artifact
