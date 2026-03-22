@@ -1,11 +1,13 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
-import 'package:universal_file_previewer/src/platform/platform_channel.dart';
+import 'package:cross_platform_video_thumbnails/cross_platform_video_thumbnails.dart';
 import 'package:unidrop/features/server/share_host_service.dart';
 import 'package:unidrop/features/server/share_link_provider.dart';
 import 'package:unidrop/utils/ip_address_utils.dart';
@@ -130,7 +132,21 @@ class _ShareLinkPageState extends ConsumerState<ShareLinkPage> {
     int maxWidth = 400,
     int quality = 40,
   }) async {
-    return FilePreviewerChannel.generateVideoThumbnail(videoPath);
+    try {
+      final qualityScale = (quality / 100).clamp(0.0, 1.0).toDouble();
+      final result = await CrossPlatformVideoThumbnails.generateThumbnail(
+        videoPath,
+        ThumbnailOptions(
+          timePosition: 0,
+          width: maxWidth,
+          height: maxWidth,
+          quality: qualityScale,
+        ),
+      );
+      return Uint8List.fromList(result.data);
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<Uint8List?> _generateVideoThumbnailFromBytes(
@@ -138,6 +154,25 @@ class _ShareLinkPageState extends ConsumerState<ShareLinkPage> {
     int maxWidth = 400,
     int quality = 40,
   }) async {
+    if (kIsWeb) {
+      try {
+        final qualityScale = (quality / 100).clamp(0.0, 1.0).toDouble();
+        final dataUri = 'data:video/mp4;base64,${base64Encode(videoBytes)}';
+        final result = await CrossPlatformVideoThumbnails.generateThumbnail(
+          dataUri,
+          ThumbnailOptions(
+            timePosition: 0,
+            width: maxWidth,
+            height: maxWidth,
+            quality: qualityScale,
+          ),
+        );
+        return Uint8List.fromList(result.data);
+      } catch (_) {
+        return null;
+      }
+    }
+
     final tempVideoFile = File(
       '${Directory.systemTemp.path}${Platform.pathSeparator}share_video_${DateTime.now().millisecondsSinceEpoch}.mp4',
     );

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:cross_platform_video_thumbnails/cross_platform_video_thumbnails.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_editor_plus/image_editor_plus.dart';
@@ -405,6 +406,74 @@ class _WebSendPageState extends ConsumerState<WebSendPage> {
     );
   }
 
+  Future<Uint8List?> _generateVideoThumbnailFromBytes(
+    Uint8List videoBytes, {
+    int maxWidth = 360,
+    int quality = 40,
+  }) async {
+    try {
+      final qualityScale = (quality / 100).clamp(0.0, 1.0).toDouble();
+      final dataUri = 'data:video/mp4;base64,${base64Encode(videoBytes)}';
+      final result = await CrossPlatformVideoThumbnails.generateThumbnail(
+        dataUri,
+        ThumbnailOptions(
+          timePosition: 0,
+          width: maxWidth,
+          height: maxWidth,
+          quality: qualityScale,
+        ),
+      );
+      return Uint8List.fromList(result.data);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Widget _buildSelectedFilePreview() {
+    if (_selectedFileName == null || _selectedFileBytes == null) {
+      return const SizedBox.shrink();
+    }
+
+    final isImage = _isImageFile(_selectedFileName!);
+    final isVideo = _isVideoFile(_selectedFileName!);
+
+    Widget child;
+    if (isImage) {
+      child = Image.memory(_selectedFileBytes!, fit: BoxFit.contain);
+    } else if (isVideo) {
+      child = FutureBuilder<Uint8List?>(
+        future: _generateVideoThumbnailFromBytes(_selectedFileBytes!),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasData && snapshot.data != null) {
+            return Image.memory(snapshot.data!, fit: BoxFit.contain);
+          }
+          return const Center(child: Text('Video thumbnail unavailable'));
+        },
+      );
+    } else {
+      child = const Center(
+        child: Icon(Icons.insert_drive_file_outlined, size: 56),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Container(
+        width: double.infinity,
+        height: 220,
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade400),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: child,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -492,6 +561,7 @@ class _WebSendPageState extends ConsumerState<WebSendPage> {
                           ),
                         ],
                       ),
+                      _buildSelectedFilePreview(),
                       const SizedBox(height: 16),
                       TextField(
                         controller: _textController,

@@ -1,5 +1,7 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:cross_platform_video_thumbnails/cross_platform_video_thumbnails.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 import 'package:unidrop/features/receive/received_file_provider.dart';
@@ -7,7 +9,6 @@ import 'package:unidrop/models/received_file_info.dart';
 import 'package:mime/mime.dart';
 import 'package:logging/logging.dart';
 import 'package:unidrop/widgets/copyable_error_snackbar.dart';
-import 'package:universal_file_previewer/universal_file_previewer.dart';
 
 /// A dialog widget that displays received file information and provides options to keep or delete the file.
 /// Shows a thumbnail preview for images and videos, and handles file operations across different platforms.
@@ -25,18 +26,6 @@ class ReceivedFileDialog extends ConsumerStatefulWidget {
 class _ReceivedFileDialogState extends ConsumerState<ReceivedFileDialog> {
   static final _logger = Logger('ReceivedFileDialog');
   String? _mimeType;
-  FileType? _detectedType;
-
-  static const Map<String, List<String>> _supportedPreviewGroups = {
-    'Images': ['JPG', 'PNG', 'GIF', 'WEBP', 'BMP', 'SVG', 'HEIC', 'TIFF'],
-    'Video': ['MP4', 'MOV', 'AVI', 'MKV', 'WEBM'],
-    'Audio': ['MP3', 'WAV', 'AAC', 'FLAC', 'OGG'],
-    'Documents': ['PDF', 'DOCX', 'DOC', 'XLSX', 'XLS', 'PPTX', 'PPT'],
-    'Text / Data': ['TXT', 'MD', 'CSV', 'JSON', 'XML', 'HTML'],
-    'Code': ['DART', 'JS', 'TS', 'PY', 'JAVA', 'C/C++', 'GO', 'RUST'],
-    'Archive': ['ZIP', 'RAR', 'TAR', 'GZ', '7Z'],
-    '3D': ['GLB', 'GLTF', 'OBJ', 'STL'],
-  };
 
   @override
   void initState() {
@@ -44,53 +33,88 @@ class _ReceivedFileDialogState extends ConsumerState<ReceivedFileDialog> {
     _mimeType = lookupMimeType(widget.fileInfo.path);
   }
 
+  bool get _isImageFile => _mimeType?.startsWith('image/') ?? false;
+
+  bool get _isVideoFile => _mimeType?.startsWith('video/') ?? false;
+
+  Future<Uint8List?> _generateVideoThumbnailData(
+    String videoPath, {
+    int maxWidth = 360,
+    int quality = 40,
+  }) async {
+    try {
+      final qualityScale = (quality / 100).clamp(0.0, 1.0).toDouble();
+      final result = await CrossPlatformVideoThumbnails.generateThumbnail(
+        videoPath,
+        ThumbnailOptions(
+          timePosition: 0,
+          width: maxWidth,
+          height: maxWidth,
+          quality: qualityScale,
+        ),
+      );
+      return Uint8List.fromList(result.data);
+    } catch (_) {
+      return null;
+    }
+  }
+
   Widget _buildFilePreview() {
+    if (_isImageFile) {
+      return SizedBox(
+        height: 220,
+        width: 320,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.file(
+            File(widget.fileInfo.path),
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => const Center(
+              child: Text('Preview unavailable'),
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_isVideoFile) {
+      return SizedBox(
+        height: 220,
+        width: 320,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: FutureBuilder<Uint8List?>(
+            future: _generateVideoThumbnailData(widget.fileInfo.path),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasData && snapshot.data != null) {
+                return Image.memory(snapshot.data!, fit: BoxFit.contain);
+              }
+              return const Center(child: Text('Preview unavailable'));
+            },
+          ),
+        ),
+      );
+    }
+
     return SizedBox(
       height: 220,
       width: 320,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: FilePreviewWidget(
-          file: File(widget.fileInfo.path),
-          config: PreviewConfig(
-            showToolbar: false,
-            showFileInfo: false,
-            errorBuilder: (error) => Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Icon(Icons.insert_drive_file, size: 50, color: Colors.grey),
-                  SizedBox(height: 8),
-                  Text('Preview unavailable'),
-                ],
-              ),
-            ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: const [
+              Icon(Icons.insert_drive_file, size: 50, color: Colors.grey),
+              SizedBox(height: 8),
+              Text('No preview for this file type'),
+            ],
           ),
-          onTypeDetected: (type) {
-            if (!mounted || _detectedType == type) {
-              return;
-            }
-            setState(() => _detectedType = type);
-          },
         ),
       ),
-    );
-  }
-
-  Widget _buildSupportedFormats() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: _supportedPreviewGroups.entries
-          .map(
-            (entry) => Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Text(
-                '${entry.key}: ${entry.value.join(', ')}',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ),
-          )
-          .toList(),
     );
   }
 
@@ -204,7 +228,7 @@ class _ReceivedFileDialogState extends ConsumerState<ReceivedFileDialog> {
             Center(child: _buildFilePreview()),
             const SizedBox(height: 12),
             Text(
-              'Detected type: ${_detectedType?.label ?? 'Detecting...'}',
+              'Detected MIME type: ${_mimeType ?? 'Unknown'}',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 12),
@@ -212,13 +236,6 @@ class _ReceivedFileDialogState extends ConsumerState<ReceivedFileDialog> {
               'Received file: "${widget.fileInfo.filename}".\nKeep it or delete it?',
               textAlign: TextAlign.left,
             ),
-            const SizedBox(height: 12),
-            Text(
-              'Universal preview supports:',
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-            const SizedBox(height: 6),
-            _buildSupportedFormats(),
           ],
         ),
       ),

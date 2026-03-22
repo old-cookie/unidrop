@@ -1,5 +1,7 @@
 import 'dart:typed_data';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:unidrop/features/discovery/discovery_provider.dart';
@@ -21,7 +23,7 @@ import 'package:image_editor_plus/image_editor_plus.dart';
 import 'package:unidrop/pages/video_editor_page.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:async';
-import 'package:universal_file_previewer/src/platform/platform_channel.dart';
+import 'package:cross_platform_video_thumbnails/cross_platform_video_thumbnails.dart';
 import 'package:unidrop/pages/settings_page.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'package:unidrop/providers/device_selection_provider.dart';
@@ -208,7 +210,48 @@ class _HomePageState extends ConsumerState<HomePage> {
     int maxWidth = 150,
     int quality = 25,
   }) async {
-    return FilePreviewerChannel.generateVideoThumbnail(videoPath);
+    try {
+      final qualityScale = (quality / 100).clamp(0.0, 1.0).toDouble();
+      final result = await CrossPlatformVideoThumbnails.generateThumbnail(
+        videoPath,
+        ThumbnailOptions(
+          timePosition: 0,
+          width: maxWidth,
+          height: maxWidth,
+          quality: qualityScale,
+        ),
+      );
+      return Uint8List.fromList(result.data);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Uint8List?> _generateVideoThumbnailFromBytes(
+    Uint8List videoBytes, {
+    int maxWidth = 150,
+    int quality = 25,
+  }) async {
+    if (kIsWeb) {
+      try {
+        final qualityScale = (quality / 100).clamp(0.0, 1.0).toDouble();
+        final dataUri = 'data:video/mp4;base64,${base64Encode(videoBytes)}';
+        final result = await CrossPlatformVideoThumbnails.generateThumbnail(
+          dataUri,
+          ThumbnailOptions(
+            timePosition: 0,
+            width: maxWidth,
+            height: maxWidth,
+            quality: qualityScale,
+          ),
+        );
+        return Uint8List.fromList(result.data);
+      } catch (_) {
+        return null;
+      }
+    }
+
+    return null;
   }
 
   // Remove _loadFavorites and _saveFavorites - managed by SettingsNotifier
@@ -726,13 +769,19 @@ class _HomePageState extends ConsumerState<HomePage> {
         thumbnailWidget = const Icon(Icons.image_not_supported, size: 50);
       }
     } else if (isVideo) {
-      if (_selectedFilePath != null) {
+      if (_selectedFilePath != null || _selectedFileBytes != null) {
         thumbnailWidget = FutureBuilder<Uint8List?>(
-          future: _generateVideoThumbnailData(
-            _selectedFilePath!,
-            maxWidth: 150,
-            quality: 25,
-          ),
+          future: _selectedFilePath != null
+              ? _generateVideoThumbnailData(
+                  _selectedFilePath!,
+                  maxWidth: 150,
+                  quality: 25,
+                )
+              : _generateVideoThumbnailFromBytes(
+                  _selectedFileBytes!,
+                  maxWidth: 150,
+                  quality: 25,
+                ),
           builder: (BuildContext context, AsyncSnapshot<Uint8List?> snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
@@ -1429,7 +1478,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       ref.read(deviceSelectionProvider.notifier).clearSelection();
       _hasShownLongPressMultiSelectHint = false;
       if (!mounted) return;
-      final bool shouldLoadBytes = fileType == FileType.image;
+      final bool shouldLoadBytes = kIsWeb || fileType == FileType.image;
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: fileType,
         withData: shouldLoadBytes,

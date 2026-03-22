@@ -47,8 +47,9 @@ dependencies:
   pro_image_editor: ^12.0.0
   pro_video_editor: ^1.7.0
 
+  cross_platform_video_thumbnails: ^0.1.1
   video_player: ^2.11.0
-  universal_file_previewer: ^0.3.0
+
 
   # Utilities
   basic_utils: ^5.7.0
@@ -62,7 +63,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-
-dependency_overrides:
-  universal_file_previewer:
-    path: third_party/universal_file_previewer
