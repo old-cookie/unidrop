@@ -69,7 +69,7 @@ class _ReceivedFileDialogState extends ConsumerState<ReceivedFileDialog> {
           child: Image.file(
             File(widget.fileInfo.path),
             fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) =>
+            errorBuilder: (_, _, _) =>
                 const Center(child: Text('Preview unavailable')),
           ),
         ),
