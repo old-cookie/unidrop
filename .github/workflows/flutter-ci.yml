@@ -58,6 +58,14 @@ jobs:
       - name: Build Windows release
         run: flutter build windows --release
 
+      - name: Read app version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | tr -d '\r')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
       - name: Prepare Flutter build output for MSI action
         shell: pwsh
         run: Move-Item -Path build -Destination flutter-build
@@ -80,6 +88,27 @@ jobs:
       - name: Install go-msi
         shell: pwsh
         run: choco install -y go-msi
+
+      - name: Create wix.json configuration
+        shell: pwsh
+        run: |
+          $wixConfig = @{
+            productName = "UniDrop"
+            productVersion = "${{ steps.version.outputs.version }}"
+            companyName = "UniDrop"
+            projectUrl = ""
+            license = ""
+            upgradeCode = ""
+            arch = "x64"
+            includeLicenseAgreement = $false
+            files = @(
+              @{
+                source = "application/*"
+                target = "ProgramFilesFolder"
+              }
+            )
+          }
+          $wixConfig | ConvertTo-Json -Depth 10 | Out-File -FilePath "wix.json" -Encoding UTF8
 
       - name: Build Windows Installer MSI from exe file
         uses: AliceOh/CreateWindowsInstaller@1.0.0
