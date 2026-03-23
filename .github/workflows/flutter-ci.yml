@@ -366,12 +366,12 @@ jobs:
           set -euo pipefail
           mkdir -p out
           cp dist/android-release-apk/app-release.apk out/unidrop-android-v${VERSION}.apk
-          (cd dist/windows-release-bundle && zip -r ../../out/unidrop-windows-v${VERSION}.zip .)
+          (cd dist/windows-release-bundle && zip -r ../../out/unidrop-windows-v${VERSION}.zip . -x "*.msi")
           (cd dist/linux-release-bundle && zip -r ../../out/unidrop-linux-v${VERSION}.zip .)
           (cd dist/macos-release-bundle && zip -r ../../out/unidrop-macos-v${VERSION}.zip .)
           (cd dist/ios-release-runner-app && zip -r ../../out/unidrop-ios-v${VERSION}.zip .)
-          if ls dist/windows-installer-msi/*.msi >/dev/null 2>&1; then
-            MSI_FILE=$(ls dist/windows-installer-msi/*.msi | head -n 1)
+          MSI_FILE=$(find dist/windows-installer-msi -type f -name '*.msi' | head -n 1 || true)
+          if [ -n "$MSI_FILE" ]; then
             cp "$MSI_FILE" "out/unidrop-windows-installer-v${VERSION}.msi"
           fi
           if ls dist/macos-installer-pkg/*.pkg >/dev/null 2>&1; then
@@ -388,5 +388,6 @@ jobs:
           tag_name: v${{ steps.version.outputs.version }}
           name: v${{ steps.version.outputs.version }}
           generate_release_notes: true
-          prerelease: true
+          prerelease: false
+          make_latest: true
           files: out/*
