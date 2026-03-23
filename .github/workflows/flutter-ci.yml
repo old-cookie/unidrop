@@ -219,8 +219,46 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Read app version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | tr -d '\r')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
       - name: Build macOS release
         run: flutter build macos --release
+
+      - name: Detect macOS app bundle path
+        id: macos_app
+        shell: bash
+        run: |
+          set -euo pipefail
+          RELEASE_DIR="build/macos/Build/Products/Release"
+          APP_PATH=$(find "$RELEASE_DIR" -maxdepth 1 -name "*.app" | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            echo "No .app found in $RELEASE_DIR"
+            exit 1
+          fi
+          APP_BUNDLE=$(basename "$APP_PATH")
+          echo "bundle_path=$APP_BUNDLE" >> "$GITHUB_OUTPUT"
+
+      - name: Build macOS installer package
+        id: macos_installer
+        uses: akiojin/generate-mac-installer-github-action@v0.1.0
+        with:
+          root-directory: build/macos/Build/Products/Release
+          bundle-path: ${{ steps.macos_app.outputs.bundle_path }}
+          identifier: com.oldcokie.unidrop
+          version: ${{ steps.version.outputs.version }}
+
+      - name: Upload macOS installer artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-installer-pkg
+          path: ${{ steps.macos_installer.outputs.output-path }}
+          if-no-files-found: error
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v7
@@ -335,6 +373,10 @@ jobs:
           if ls dist/windows-installer-msi/*.msi >/dev/null 2>&1; then
             MSI_FILE=$(ls dist/windows-installer-msi/*.msi | head -n 1)
             cp "$MSI_FILE" "out/unidrop-windows-installer-v${VERSION}.msi"
+          fi
+          if ls dist/macos-installer-pkg/*.pkg >/dev/null 2>&1; then
+            PKG_FILE=$(ls dist/macos-installer-pkg/*.pkg | head -n 1)
+            cp "$PKG_FILE" "out/unidrop-macos-installer-v${VERSION}.pkg"
           fi
           if [ -f dist/linux-appimage/unidrop-x86_64.AppImage ]; then
             cp dist/linux-appimage/unidrop-x86_64.AppImage out/unidrop-linux-appimage-v${VERSION}.AppImage
