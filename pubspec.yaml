@@ -39,6 +39,7 @@ dependencies:
   encrypt_shared_preferences: ^1.0.1
   local_auth: ^3.0.1
   permission_handler: ^12.0.1
+  share_handler: ^0.0.25
 
   # Media processing
   image: ^4.5.4

@@ -14,15 +14,17 @@ typedef ThemeState = ({
   ThemeMode mode,
   String brightnessValue,
   ThemeData lightTheme,
-  ThemeData darkTheme
+  ThemeData darkTheme,
 });
 
 /// Provider for encrypted shared preferences instance.
 /// This provider must be overridden with an actual implementation.
-final sharedPreferencesProvider =
-    Provider<EncryptedSharedPreferencesAsync>((ref) {
+final sharedPreferencesProvider = Provider<EncryptedSharedPreferencesAsync>((
+  ref,
+) {
   throw UnimplementedError(
-      'EncryptedSharedPreferencesAsync provider was not overridden');
+    'EncryptedSharedPreferencesAsync provider was not overridden',
+  );
 });
 
 /// StateNotifierProvider that manages the theme state of the application.
@@ -45,7 +47,7 @@ class ThemeStateNotifier extends Notifier<ThemeState> {
       mode: ThemeMode.system,
       brightnessValue: 'system',
       lightTheme: themeModifier(ThemeData.light()),
-      darkTheme: themeModifier(ThemeData.dark())
+      darkTheme: themeModifier(ThemeData.dark()),
     );
   }
 
@@ -70,7 +72,8 @@ class ThemeStateNotifier extends Notifier<ThemeState> {
   /// Calculates the theme mode based on stored preferences.
   /// Returns a Future that resolves to the appropriate ThemeMode.
   static Future<ThemeMode> _calculateThemeMode(
-      EncryptedSharedPreferencesAsync prefs) async {
+    EncryptedSharedPreferencesAsync prefs,
+  ) async {
     return await themeMode(prefs);
   }
 
@@ -90,16 +93,17 @@ void main() async {
   _configureLogging();
   // Initialize EncryptedSharedPreferencesAsync with CustomEncryptor
   final key = "UniDropUniDropUniDropUniDrop"; // 32 chars for AES-256
-  await EncryptedSharedPreferencesAsync.initialize(key,
-      encryptor: CustomEncryptor());
-  // Also initialize the legacy API to potentially satisfy internal checks
-  await EncryptedSharedPreferences.initialize(key,
-      encryptor: CustomEncryptor());
+  await EncryptedSharedPreferencesAsync.initialize(
+    key,
+    encryptor: CustomEncryptor(),
+  );
   final prefsInstance = EncryptedSharedPreferencesAsync.getInstance();
-  runApp(ProviderScope(
-    overrides: [sharedPreferencesProvider.overrideWithValue(prefsInstance)],
-    child: const MyApp(),
-  ));
+  runApp(
+    ProviderScope(
+      overrides: [sharedPreferencesProvider.overrideWithValue(prefsInstance)],
+      child: const MyApp(),
+    ),
+  );
 }
 
 void _configureLogging() {
@@ -137,9 +141,7 @@ class MyApp extends ConsumerWidget {
       loading: () {
         // Show a loading indicator while settings are loading
         return const MaterialApp(
-          home: Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          ),
+          home: Scaffold(body: Center(child: CircularProgressIndicator())),
         );
       },
       error: (err, stack) {

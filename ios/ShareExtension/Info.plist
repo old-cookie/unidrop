@@ -4,25 +4,25 @@
 <dict>
 	<key>AppGroupId</key>
 	<string>group.com.oldcokie.unidrop</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>unidropshare</string>
+		<string>ShareMedia-com.oldcokie.unidrop</string>
+	</array>
 	<key>NSExtension</key>
 	<dict>
 		<key>NSExtensionAttributes</key>
 		<dict>
-			<key>PHSupportedMediaTypes</key>
-			<array>
-				<string>Image</string>
-				<string>Video</string>
-			</array>
 			<key>NSExtensionActivationRule</key>
 			<dict>
 				<key>NSExtensionActivationSupportsImageWithMaxCount</key>
-				<integer>10</integer>
+				<integer>20</integer>
 				<key>NSExtensionActivationSupportsMovieWithMaxCount</key>
-				<integer>10</integer>
+				<integer>20</integer>
 			</dict>
 		</dict>
-		<key>NSExtensionPrincipalClass</key>
-		<string>$(PRODUCT_MODULE_NAME).ShareViewController</string>
+		<key>NSExtensionMainStoryboard</key>
+		<string>MainInterface</string>
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.share-services</string>
 	</dict>

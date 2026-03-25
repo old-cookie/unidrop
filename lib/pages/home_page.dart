@@ -1,8 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart'
-    show Clipboard, ClipboardData, MethodCall, MethodChannel;
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:unidrop/features/discovery/discovery_provider.dart';
 import 'package:unidrop/features/discovery/discovery_service.dart';
@@ -34,6 +33,7 @@ import 'package:unidrop/pages/qr_scanner_page.dart';
 import 'package:unidrop/pages/share_link_page.dart';
 import 'package:logging/logging.dart'; // Import the logging package
 import 'package:mime/mime.dart';
+import 'package:share_handler/share_handler.dart';
 import 'package:unidrop/widgets/copyable_error_snackbar.dart';
 import 'package:unidrop/utils/ip_address_utils.dart';
 
@@ -63,14 +63,12 @@ class HomePage extends ConsumerStatefulWidget {
 
 class _HomePageState extends ConsumerState<HomePage> {
   final _log = Logger('HomePage'); // Create a logger instance
-  static const MethodChannel _shareChannel = MethodChannel(
-    'com.oldcokie.unidrop/share',
-  );
   String? _selectedFilePath;
   String? _selectedFileName;
   Uint8List? _selectedFileBytes;
   bool _isSending = false;
-  bool _isShareChannelInitialized = false;
+  bool _isShareHandlerInitialized = false;
+  StreamSubscription<SharedMedia>? _shareMediaSubscription;
   final TextEditingController _ipController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _textController = TextEditingController();
@@ -105,83 +103,100 @@ class _HomePageState extends ConsumerState<HomePage> {
         fileNameLower.endsWith('.webm');
   }
 
-  Future<void> _initializeAndroidShareReceiver() async {
-    if (!(Platform.isAndroid || Platform.isIOS) || _isShareChannelInitialized) {
+  Future<void> _initializeShareHandlerReceiver() async {
+    if (!(Platform.isAndroid || Platform.isIOS) || _isShareHandlerInitialized) {
       return;
     }
 
-    _isShareChannelInitialized = true;
-    _shareChannel.setMethodCallHandler(_handleShareMethodCall);
+    _isShareHandlerInitialized = true;
+    final handler = ShareHandlerPlatform.instance;
+
+    _shareMediaSubscription = handler.sharedMediaStream.listen((media) async {
+      final handled = await _handleSharedMedia(media);
+      if (!handled) return;
+      try {
+        await handler.resetInitialSharedMedia();
+      } catch (e) {
+        _log.warning('Failed to reset shared media after stream event', e);
+      }
+    });
 
     try {
-      final initialSharedMedia = await _shareChannel.invokeListMethod<dynamic>(
-        'getInitialSharedMedia',
-      );
-      await _handleSharedMediaPayload(initialSharedMedia);
+      final initialSharedMedia = await _getInitialSharedMediaWithRetry(handler);
+      final handled = await _handleSharedMedia(initialSharedMedia);
 
-      if (initialSharedMedia != null && initialSharedMedia.isNotEmpty) {
-        await _shareChannel.invokeMethod<void>('clearInitialSharedMedia');
+      if (handled) {
+        await handler.resetInitialSharedMedia();
       }
     } catch (e) {
       _log.warning('Failed to initialize share receiver', e);
     }
   }
 
-  Future<dynamic> _handleShareMethodCall(MethodCall call) async {
-    if (call.method == 'onSharedMedia') {
-      await _handleSharedMediaPayload(call.arguments);
+  Future<SharedMedia?> _getInitialSharedMediaWithRetry(
+    ShareHandlerPlatform handler,
+  ) async {
+    const maxAttempts = 4;
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      final media = await handler.getInitialSharedMedia();
+      if (_hasUsableSharedAttachment(media)) {
+        return media;
+      }
+      if (attempt < maxAttempts - 1) {
+        await Future.delayed(const Duration(milliseconds: 250));
+      }
     }
-    return null;
+    return handler.getInitialSharedMedia();
   }
 
-  List<Map<String, String?>> _parseSharedMediaPayload(dynamic payload) {
-    if (payload is! List) {
-      return const [];
+  bool _hasUsableSharedAttachment(SharedMedia? sharedMedia) {
+    final attachments = sharedMedia?.attachments;
+    if (attachments == null || attachments.isEmpty) {
+      return false;
     }
-
-    final parsed = <Map<String, String?>>[];
-    for (final item in payload) {
-      if (item is! Map) {
-        continue;
-      }
-
-      final path = item['path']?.toString();
-      final fileName = item['fileName']?.toString();
-      final mimeType = item['mimeType']?.toString();
-
-      if (path == null ||
-          path.isEmpty ||
-          fileName == null ||
-          fileName.isEmpty) {
-        continue;
-      }
-
-      parsed.add({'path': path, 'fileName': fileName, 'mimeType': mimeType});
+    final firstAttachment = attachments.first;
+    if (firstAttachment == null) {
+      return false;
     }
-
-    return parsed;
+    return firstAttachment.path.isNotEmpty;
   }
 
-  Future<void> _handleSharedMediaPayload(dynamic payload) async {
+  Future<void> _waitForUiFrame() async {
     if (!mounted) return;
+    final completer = Completer<void>();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!completer.isCompleted) {
+        completer.complete();
+      }
+    });
+    await completer.future;
+  }
 
-    final media = _parseSharedMediaPayload(payload);
-    if (media.isEmpty) {
-      return;
+  Future<bool> _handleSharedMedia(SharedMedia? sharedMedia) async {
+    if (!mounted) return false;
+    if (sharedMedia == null) return false;
+
+    await _waitForUiFrame();
+    if (!mounted) return false;
+
+    final attachments = sharedMedia.attachments;
+    if (attachments == null || attachments.isEmpty) {
+      return false;
     }
 
-    final first = media.first;
-    final path = first['path'];
-    final fileName = first['fileName'];
-
-    if (path == null || fileName == null) {
-      return;
+    final firstAttachment = attachments.first;
+    if (firstAttachment == null) {
+      return false;
     }
 
-    final resolvedMimeType =
-        (first['mimeType'] != null && first['mimeType']!.isNotEmpty)
-        ? first['mimeType']
-        : (lookupMimeType(path) ?? lookupMimeType(fileName));
+    final path = firstAttachment.path;
+    if (path.isEmpty) {
+      return false;
+    }
+
+    final fileName = path.split('/').last;
+
+    final resolvedMimeType = lookupMimeType(path) ?? lookupMimeType(fileName);
 
     final isImage =
         (resolvedMimeType?.startsWith('image/') ?? false) ||
@@ -192,15 +207,16 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     if (isImage) {
       _showPhotoSendDialog(fileName: fileName, filePath: path);
-      return;
+      return true;
     }
 
     if (isVideo) {
       _showVideoSendDialog(fileName: fileName, filePath: path);
-      return;
+      return true;
     }
 
     _setPickedFile(path: path, name: fileName);
+    return true;
   }
 
   void _showPhotoSendDialog({
@@ -294,7 +310,10 @@ class _HomePageState extends ConsumerState<HomePage> {
     super.initState();
     // Remove _loadFavorites(); - favorites are loaded via provider
     _fetchLocalIp();
-    _initializeAndroidShareReceiver();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _initializeShareHandlerReceiver();
+    });
     Future.microtask(() async {
       if (!mounted) return;
       final localRef = ref;
@@ -359,10 +378,8 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   @override
   void dispose() {
-    if (_isShareChannelInitialized) {
-      _shareChannel.setMethodCallHandler(null);
-      _isShareChannelInitialized = false;
-    }
+    _shareMediaSubscription?.cancel();
+    _isShareHandlerInitialized = false;
     _discoveryService?.stopDiscovery();
     _serverService?.stopServer();
     _receivedFileSubscription?.close();
