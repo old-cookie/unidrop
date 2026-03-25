@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+import 'package:flutter/services.dart'
+    show Clipboard, ClipboardData, MethodCall, MethodChannel;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:unidrop/features/discovery/discovery_provider.dart';
 import 'package:unidrop/features/discovery/discovery_service.dart';
@@ -62,10 +63,14 @@ class HomePage extends ConsumerStatefulWidget {
 
 class _HomePageState extends ConsumerState<HomePage> {
   final _log = Logger('HomePage'); // Create a logger instance
+  static const MethodChannel _shareChannel = MethodChannel(
+    'com.oldcokie.unidrop/share',
+  );
   String? _selectedFilePath;
   String? _selectedFileName;
   Uint8List? _selectedFileBytes;
   bool _isSending = false;
+  bool _isShareChannelInitialized = false;
   final TextEditingController _ipController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _textController = TextEditingController();
@@ -100,11 +105,196 @@ class _HomePageState extends ConsumerState<HomePage> {
         fileNameLower.endsWith('.webm');
   }
 
+  Future<void> _initializeAndroidShareReceiver() async {
+    if (!(Platform.isAndroid || Platform.isIOS) || _isShareChannelInitialized) {
+      return;
+    }
+
+    _isShareChannelInitialized = true;
+    _shareChannel.setMethodCallHandler(_handleShareMethodCall);
+
+    try {
+      final initialSharedMedia = await _shareChannel.invokeListMethod<dynamic>(
+        'getInitialSharedMedia',
+      );
+      await _handleSharedMediaPayload(initialSharedMedia);
+
+      if (initialSharedMedia != null && initialSharedMedia.isNotEmpty) {
+        await _shareChannel.invokeMethod<void>('clearInitialSharedMedia');
+      }
+    } catch (e) {
+      _log.warning('Failed to initialize share receiver', e);
+    }
+  }
+
+  Future<dynamic> _handleShareMethodCall(MethodCall call) async {
+    if (call.method == 'onSharedMedia') {
+      await _handleSharedMediaPayload(call.arguments);
+    }
+    return null;
+  }
+
+  List<Map<String, String?>> _parseSharedMediaPayload(dynamic payload) {
+    if (payload is! List) {
+      return const [];
+    }
+
+    final parsed = <Map<String, String?>>[];
+    for (final item in payload) {
+      if (item is! Map) {
+        continue;
+      }
+
+      final path = item['path']?.toString();
+      final fileName = item['fileName']?.toString();
+      final mimeType = item['mimeType']?.toString();
+
+      if (path == null ||
+          path.isEmpty ||
+          fileName == null ||
+          fileName.isEmpty) {
+        continue;
+      }
+
+      parsed.add({'path': path, 'fileName': fileName, 'mimeType': mimeType});
+    }
+
+    return parsed;
+  }
+
+  Future<void> _handleSharedMediaPayload(dynamic payload) async {
+    if (!mounted) return;
+
+    final media = _parseSharedMediaPayload(payload);
+    if (media.isEmpty) {
+      return;
+    }
+
+    final first = media.first;
+    final path = first['path'];
+    final fileName = first['fileName'];
+
+    if (path == null || fileName == null) {
+      return;
+    }
+
+    final resolvedMimeType =
+        (first['mimeType'] != null && first['mimeType']!.isNotEmpty)
+        ? first['mimeType']
+        : (lookupMimeType(path) ?? lookupMimeType(fileName));
+
+    final isImage =
+        (resolvedMimeType?.startsWith('image/') ?? false) ||
+        _isImageFileName(fileName);
+    final isVideo =
+        (resolvedMimeType?.startsWith('video/') ?? false) ||
+        _isVideoFileName(fileName);
+
+    if (isImage) {
+      _showPhotoSendDialog(fileName: fileName, filePath: path);
+      return;
+    }
+
+    if (isVideo) {
+      _showVideoSendDialog(fileName: fileName, filePath: path);
+      return;
+    }
+
+    _setPickedFile(path: path, name: fileName);
+  }
+
+  void _showPhotoSendDialog({
+    required String fileName,
+    String? filePath,
+    Uint8List? fileBytes,
+  }) {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Send Photo'),
+          content: const Text('Do you want to edit the photo before sending?'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Edit Photo'),
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                if (!mounted) return;
+                _navigateToEditor(
+                  bytes: fileBytes,
+                  path: filePath,
+                  fileName: fileName,
+                );
+              },
+            ),
+            TextButton(
+              child: const Text('Send Directly'),
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                if (!mounted) return;
+                _setPickedFile(
+                  bytes: fileBytes,
+                  path: filePath,
+                  name: fileName,
+                );
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showVideoSendDialog({
+    required String fileName,
+    String? filePath,
+    Uint8List? fileBytes,
+  }) {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Send Video'),
+          content: const Text('Do you want to edit the video before sending?'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                if (!mounted) return;
+                _navigateToVideoEditor(
+                  bytes: filePath == null ? fileBytes : null,
+                  path: filePath,
+                  fileName: fileName,
+                );
+              },
+              child: const Text('Edit Video'),
+            ),
+            TextButton(
+              child: const Text('Send Directly'),
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                if (!mounted) return;
+                _setPickedFile(
+                  bytes: filePath == null ? fileBytes : null,
+                  path: filePath,
+                  name: fileName,
+                );
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   void initState() {
     super.initState();
     // Remove _loadFavorites(); - favorites are loaded via provider
     _fetchLocalIp();
+    _initializeAndroidShareReceiver();
     Future.microtask(() async {
       if (!mounted) return;
       final localRef = ref;
@@ -169,6 +359,10 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   @override
   void dispose() {
+    if (_isShareChannelInitialized) {
+      _shareChannel.setMethodCallHandler(null);
+      _isShareChannelInitialized = false;
+    }
     _discoveryService?.stopDiscovery();
     _serverService?.stopServer();
     _receivedFileSubscription?.close();
@@ -1501,83 +1695,17 @@ class _HomePageState extends ConsumerState<HomePage> {
             (fileType == FileType.any && isDetectedVideo);
 
         if (shouldHandleAsImage && (fileBytes != null || filePath != null)) {
-          if (!mounted) return;
-          showDialog(
-            context: context,
-            builder: (BuildContext dialogContext) {
-              return AlertDialog(
-                title: const Text('Send Photo'),
-                content: const Text(
-                  'Do you want to edit the photo before sending?',
-                ),
-                actions: <Widget>[
-                  TextButton(
-                    child: const Text('Edit Photo'),
-                    onPressed: () {
-                      Navigator.of(dialogContext).pop();
-                      if (!mounted) return;
-                      _navigateToEditor(
-                        bytes: fileBytes,
-                        path: filePath,
-                        fileName: fileName,
-                      );
-                    },
-                  ),
-                  TextButton(
-                    child: const Text('Send Directly'),
-                    onPressed: () {
-                      Navigator.of(dialogContext).pop();
-                      if (!mounted) return;
-                      _setPickedFile(
-                        bytes: fileBytes,
-                        path: filePath,
-                        name: fileName,
-                      );
-                    },
-                  ),
-                ],
-              );
-            },
+          _showPhotoSendDialog(
+            fileName: fileName,
+            filePath: filePath,
+            fileBytes: fileBytes,
           );
         } else if (shouldHandleAsVideo &&
             (fileBytes != null || filePath != null)) {
-          if (!mounted) return;
-          showDialog(
-            context: context,
-            builder: (BuildContext dialogContext) {
-              return AlertDialog(
-                title: const Text('Send Video'),
-                content: const Text(
-                  'Do you want to edit the video before sending?',
-                ),
-                actions: <Widget>[
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(dialogContext).pop();
-                      if (!mounted) return;
-                      _navigateToVideoEditor(
-                        bytes: filePath == null ? fileBytes : null,
-                        path: filePath,
-                        fileName: fileName,
-                      );
-                    },
-                    child: const Text('Edit Video'),
-                  ),
-                  TextButton(
-                    child: const Text('Send Directly'),
-                    onPressed: () {
-                      Navigator.of(dialogContext).pop();
-                      if (!mounted) return;
-                      _setPickedFile(
-                        bytes: filePath == null ? fileBytes : null,
-                        path: filePath,
-                        name: fileName,
-                      );
-                    },
-                  ),
-                ],
-              );
-            },
+          _showVideoSendDialog(
+            fileName: fileName,
+            filePath: filePath,
+            fileBytes: fileBytes,
           );
         } else if (fileBytes != null) {
           _setPickedFile(bytes: fileBytes, path: null, name: fileName);
