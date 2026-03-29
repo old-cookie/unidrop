@@ -1,10 +1,10 @@
 name: unidrop
 description: UFCFS4-30-3 Creative Technologies Project.
 publish_to: "none"
-version: 4.0.3
+version: 4.0.4
 
 environment:
-  sdk: ">=3.11.0 <=3.11.3"
+  sdk: ">=3.11.0"
 
 dependencies:
   flutter:
