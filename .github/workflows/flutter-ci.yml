@@ -331,7 +331,17 @@ jobs:
         uses: actions/deploy-pages@v4.0.5
 
   publish-release:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: >
+      always() &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      (
+        needs.android-release.result == 'success' ||
+        needs.windows-release.result == 'success' ||
+        needs.linux-release.result == 'success' ||
+        needs.macos-release.result == 'success' ||
+        needs.ios-release.result == 'success'
+      )
     needs:
       - android-release
       - windows-release
@@ -365,11 +375,21 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p out
-          cp dist/android-release-apk/app-release.apk out/unidrop-android-v${VERSION}.apk
-          (cd dist/windows-release-bundle && zip -r ../../out/unidrop-windows-v${VERSION}.zip . -x "*.msi")
-          (cd dist/linux-release-bundle && zip -r ../../out/unidrop-linux-v${VERSION}.zip .)
-          (cd dist/macos-release-bundle && zip -r ../../out/unidrop-macos-v${VERSION}.zip .)
-          (cd dist/ios-release-runner-app && zip -r ../../out/unidrop-ios-v${VERSION}.zip .)
+          if [ -f dist/android-release-apk/app-release.apk ]; then
+            cp dist/android-release-apk/app-release.apk out/unidrop-android-v${VERSION}.apk
+          fi
+          if [ -d dist/windows-release-bundle ]; then
+            (cd dist/windows-release-bundle && zip -r ../../out/unidrop-windows-v${VERSION}.zip . -x "*.msi")
+          fi
+          if [ -d dist/linux-release-bundle ]; then
+            (cd dist/linux-release-bundle && zip -r ../../out/unidrop-linux-v${VERSION}.zip .)
+          fi
+          if [ -d dist/macos-release-bundle ]; then
+            (cd dist/macos-release-bundle && zip -r ../../out/unidrop-macos-v${VERSION}.zip .)
+          fi
+          if [ -d dist/ios-release-runner-app ]; then
+            (cd dist/ios-release-runner-app && zip -r ../../out/unidrop-ios-v${VERSION}.zip .)
+          fi
           MSI_FILE=$(find dist/windows-installer-msi -type f -name '*.msi' | head -n 1 || true)
           if [ -n "$MSI_FILE" ]; then
             cp "$MSI_FILE" "out/unidrop-windows-installer-v${VERSION}.msi"
@@ -380,6 +400,10 @@ jobs:
           fi
           if [ -f dist/linux-appimage/unidrop-x86_64.AppImage ]; then
             cp dist/linux-appimage/unidrop-x86_64.AppImage out/unidrop-linux-appimage-v${VERSION}.AppImage
+          fi
+          if ! ls out/* >/dev/null 2>&1; then
+            echo "No release artifacts available to publish."
+            exit 1
           fi
 
       - name: Publish GitHub release
