@@ -36,6 +36,7 @@ import 'package:mime/mime.dart';
 import 'package:share_handler/share_handler.dart';
 import 'package:unidrop/widgets/copyable_error_snackbar.dart';
 import 'package:unidrop/utils/ip_address_utils.dart';
+import 'package:unidrop/utils/url_cleaner.dart';
 
 class _DiscoveredDeviceGroup {
   const _DiscoveredDeviceGroup({
@@ -55,6 +56,58 @@ class _DiscoveredDeviceGroup {
   String get subtitle => devices.map((device) => device.ip).join(', ');
 }
 
+class _UrlCleanerPreviewTextController extends TextEditingController {
+  bool _enabled = false;
+  List<String> _keywords = const [];
+
+  void updateUrlCleanerConfig({
+    required bool enabled,
+    required List<String> keywords,
+  }) {
+    if (_enabled == enabled && listEquals(_keywords, keywords)) {
+      return;
+    }
+    _enabled = enabled;
+    _keywords = List<String>.unmodifiable(keywords);
+  }
+
+  @override
+  TextSpan buildTextSpan({
+    required BuildContext context,
+    TextStyle? style,
+    required bool withComposing,
+  }) {
+    final baseStyle = style ?? DefaultTextStyle.of(context).style;
+
+    // Keep IME composing behavior predictable by deferring to default text.
+    if (withComposing && value.isComposingRangeValid) {
+      return TextSpan(style: baseStyle, text: text);
+    }
+
+    final preview = buildUrlCleanerPreview(
+      input: text,
+      enabled: _enabled,
+      keywords: _keywords,
+    );
+
+    return TextSpan(
+      style: baseStyle,
+      children: preview.segments
+          .map(
+            (segment) => TextSpan(
+              text: segment.text,
+              style: segment.isRemoved
+                  ? baseStyle.copyWith(
+                      color: (baseStyle.color ?? Colors.white).withAlpha(110),
+                    )
+                  : null,
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
   @override
@@ -71,7 +124,8 @@ class _HomePageState extends ConsumerState<HomePage> {
   StreamSubscription<SharedMedia>? _shareMediaSubscription;
   final TextEditingController _ipController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _textController = TextEditingController();
+  final _UrlCleanerPreviewTextController _textController =
+      _UrlCleanerPreviewTextController();
   // Remove local _favorites list - use provider directly
   // static const String _favoritesPrefKey = 'favorite_devices';
   ProviderSubscription<ReceivedFileInfo?>? _receivedFileSubscription;
@@ -567,6 +621,20 @@ class _HomePageState extends ConsumerState<HomePage> {
       } else {
         final textToSend = _textController.text.trim();
         if (textToSend.isNotEmpty) {
+          final cleanedTextToSend = cleanUrlsInText(
+            input: textToSend,
+            enabled: ref.read(urlCleanerEnabledProvider),
+            keywords: ref.read(urlCleanerKeywordsProvider),
+          ).trim();
+
+          if (cleanedTextToSend.isEmpty) {
+            showCopyableSnackBar(
+              context,
+              'Text became empty after URL cleaning. Please update your text.',
+            );
+            return false;
+          }
+
           if (showProgressSnackBar) {
             scaffoldMessenger.hideCurrentSnackBar();
             showCopyableSnackBar(
@@ -577,7 +645,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           try {
             await ref
                 .read(sendServiceProvider)
-                .sendText(targetDevice, textToSend);
+                .sendText(targetDevice, cleanedTextToSend);
             if (!mounted) return false;
             if (showSuccessSnackBar) {
               scaffoldMessenger.hideCurrentSnackBar();
@@ -1074,6 +1142,31 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
+  Widget _buildSendTextInput(
+    BuildContext context, {
+    required bool urlCleanerEnabled,
+    required UrlCleanerPreviewResult urlCleanerPreview,
+  }) {
+    final inputDecoration = InputDecoration(
+      labelText: 'Enter Text to Send',
+      border: const OutlineInputBorder(),
+      helperText: urlCleanerEnabled && urlCleanerPreview.hasRemovedSegments
+          ? 'Translucent text will be removed before sending.'
+          : null,
+    );
+
+    return TextField(
+      controller: _textController,
+      maxLines: null,
+      onChanged: (_) {
+        if (!mounted) return;
+        setState(() {});
+      },
+      onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+      decoration: inputDecoration,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final List<DeviceInfo> discoveredDevices = ref.watch(
@@ -1082,6 +1175,17 @@ class _HomePageState extends ConsumerState<HomePage> {
     final groupedDiscoveredDevices = _groupDiscoveredDevices(discoveredDevices);
     final selectedDeviceKeys = ref.watch(deviceSelectionProvider);
     final alias = ref.watch(deviceAliasProvider);
+    final urlCleanerEnabled = ref.watch(urlCleanerEnabledProvider);
+    final urlCleanerKeywords = ref.watch(urlCleanerKeywordsProvider);
+    _textController.updateUrlCleanerConfig(
+      enabled: urlCleanerEnabled,
+      keywords: urlCleanerKeywords,
+    );
+    final urlCleanerPreview = buildUrlCleanerPreview(
+      input: _textController.text,
+      enabled: urlCleanerEnabled,
+      keywords: urlCleanerKeywords,
+    );
     final serverState = ref.watch(serverStateProvider);
     String? qrData;
     if (serverState.isRunning &&
@@ -1228,19 +1332,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                     child: Row(
                       children: [
                         Expanded(
-                          child: TextField(
-                            controller: _textController,
-                            maxLines: null,
-                            onChanged: (_) {
-                              if (!mounted) return;
-                              setState(() {});
-                            },
-                            onTapOutside: (_) =>
-                                FocusManager.instance.primaryFocus?.unfocus(),
-                            decoration: const InputDecoration(
-                              labelText: 'Enter Text to Send',
-                              border: OutlineInputBorder(),
-                            ),
+                          child: _buildSendTextInput(
+                            context,
+                            urlCleanerEnabled: urlCleanerEnabled,
+                            urlCleanerPreview: urlCleanerPreview,
                           ),
                         ),
                       ],

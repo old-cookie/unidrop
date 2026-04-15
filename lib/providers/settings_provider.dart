@@ -18,6 +18,10 @@ const String _prefFavoriteDevices =
     'pref_favorite_devices'; // Key for favorites
 const String _prefSecondaryColor =
     'pref_secondary_color'; // Key for secondary color
+const String _prefUrlCleanerEnabled =
+    'pref_url_cleaner_enabled'; // Key for URL cleaner toggle
+const String _prefUrlCleanerKeywords =
+    'pref_url_cleaner_keywords'; // Key for URL cleaner keywords
 
 /// Represents the complete state of application settings
 /// Contains device alias, destination directory, biometric auth setting, favorite devices, and secondary color
@@ -26,8 +30,10 @@ class SettingsState {
   final String? destinationDir;
   final bool useBiometricAuth;
   final List<Map<String, String>>
-      favoriteDevices; // List of {ip: '...', name: '...'}
+  favoriteDevices; // List of {ip: '...', name: '...'}
   final int secondaryColor; // Color as ARGB integer
+  final bool urlCleanerEnabled;
+  final List<String> urlCleanerKeywords;
 
   SettingsState({
     required this.alias,
@@ -35,6 +41,8 @@ class SettingsState {
     required this.useBiometricAuth,
     required this.favoriteDevices,
     required this.secondaryColor,
+    required this.urlCleanerEnabled,
+    required this.urlCleanerKeywords,
   });
 
   SettingsState copyWith({
@@ -43,16 +51,21 @@ class SettingsState {
     bool? useBiometricAuth,
     List<Map<String, String>>? favoriteDevices,
     int? secondaryColor,
+    bool? urlCleanerEnabled,
+    List<String>? urlCleanerKeywords,
     bool clearDestinationDir =
         false, // Flag to explicitly set destinationDir to null
   }) {
     return SettingsState(
       alias: alias ?? this.alias,
-      destinationDir:
-          clearDestinationDir ? null : destinationDir ?? this.destinationDir,
+      destinationDir: clearDestinationDir
+          ? null
+          : destinationDir ?? this.destinationDir,
       useBiometricAuth: useBiometricAuth ?? this.useBiometricAuth,
       favoriteDevices: favoriteDevices ?? this.favoriteDevices,
       secondaryColor: secondaryColor ?? this.secondaryColor,
+      urlCleanerEnabled: urlCleanerEnabled ?? this.urlCleanerEnabled,
+      urlCleanerKeywords: urlCleanerKeywords ?? this.urlCleanerKeywords,
     );
   }
 }
@@ -72,13 +85,16 @@ class SettingsNotifier extends Notifier<SettingsState> {
       data: (initialState) => initialState,
       loading: () {
         _logger.info(
-            "Settings loading... Initializing notifier with fallback state.");
+          "Settings loading... Initializing notifier with fallback state.",
+        );
         return SettingsState(
           alias: SettingsNotifier._generateDefaultAliasSyncFallback(),
           useBiometricAuth: false,
           favoriteDevices: [],
           destinationDir: null,
           secondaryColor: 0xFF2196F3,
+          urlCleanerEnabled: false,
+          urlCleanerKeywords: [],
         );
       },
       error: (err, stack) {
@@ -89,6 +105,8 @@ class SettingsNotifier extends Notifier<SettingsState> {
           favoriteDevices: [],
           destinationDir: null,
           secondaryColor: 0xFF2196F3,
+          urlCleanerEnabled: false,
+          urlCleanerKeywords: [],
         );
       },
     );
@@ -96,7 +114,8 @@ class SettingsNotifier extends Notifier<SettingsState> {
 
   // Load all settings asynchronously
   static Future<SettingsState> loadInitialState(
-      EncryptedSharedPreferencesAsync prefs) async {
+    EncryptedSharedPreferencesAsync prefs,
+  ) async {
     // Load existing alias or generate default if null
     String? alias = await prefs.getString(_prefDeviceAlias);
     if (alias == null) {
@@ -106,20 +125,28 @@ class SettingsNotifier extends Notifier<SettingsState> {
     }
 
     final destinationDir = await prefs.getString(_prefDestinationDir);
-    final useBiometricAuth =
-        await prefs.getBool(_prefUseBiometricAuth, defaultValue: false);
+    final useBiometricAuth = await prefs.getBool(
+      _prefUseBiometricAuth,
+      defaultValue: false,
+    );
 
     // Load favorite devices
-    final favoritesJson =
-        await prefs.getString(_prefFavoriteDevices, defaultValue: '[]');
+    final favoritesJson = await prefs.getString(
+      _prefFavoriteDevices,
+      defaultValue: '[]',
+    );
     List<Map<String, String>> favoriteDevices = [];
     try {
-      List<dynamic> decodedList =
-          jsonDecode(favoritesJson!); // Non-null due to defaultValue
+      List<dynamic> decodedList = jsonDecode(
+        favoritesJson!,
+      ); // Non-null due to defaultValue
       favoriteDevices = decodedList
           .whereType<Map<dynamic, dynamic>>() // Ensure items are maps
-          .map((item) => item.map((key, value) => MapEntry(key.toString(),
-              value.toString()))) // Convert keys/values to strings
+          .map(
+            (item) => item.map(
+              (key, value) => MapEntry(key.toString(), value.toString()),
+            ),
+          ) // Convert keys/values to strings
           .toList();
     } catch (e) {
       _logger.warning("Error decoding favorite devices: $e");
@@ -127,8 +154,34 @@ class SettingsNotifier extends Notifier<SettingsState> {
       await prefs.setString(_prefFavoriteDevices, '[]');
     }
 
-    final secondaryColorInt =
-        await prefs.getInt(_prefSecondaryColor, defaultValue: 0xFF2196F3);
+    final secondaryColorInt = await prefs.getInt(
+      _prefSecondaryColor,
+      defaultValue: 0xFF2196F3,
+    );
+
+    final urlCleanerEnabled = await prefs.getBool(
+      _prefUrlCleanerEnabled,
+      defaultValue: false,
+    );
+
+    final urlCleanerKeywordsJson = await prefs.getString(
+      _prefUrlCleanerKeywords,
+      defaultValue: '[]',
+    );
+    List<String> urlCleanerKeywords = [];
+    try {
+      final decodedList = jsonDecode(urlCleanerKeywordsJson!);
+      if (decodedList is List) {
+        urlCleanerKeywords = decodedList
+            .whereType<String>()
+            .map((keyword) => keyword.trim())
+            .where((keyword) => keyword.isNotEmpty)
+            .toList();
+      }
+    } catch (e) {
+      _logger.warning("Error decoding URL cleaner keywords: $e");
+      await prefs.setString(_prefUrlCleanerKeywords, '[]');
+    }
 
     return SettingsState(
       alias: alias, // Now guaranteed non-null
@@ -136,6 +189,8 @@ class SettingsNotifier extends Notifier<SettingsState> {
       useBiometricAuth: useBiometricAuth!, // Non-null due to defaultValue
       favoriteDevices: favoriteDevices,
       secondaryColor: secondaryColorInt!,
+      urlCleanerEnabled: urlCleanerEnabled!,
+      urlCleanerKeywords: urlCleanerKeywords,
     );
   }
 
@@ -227,8 +282,9 @@ class SettingsNotifier extends Notifier<SettingsState> {
       return; // Or update existing? For now, just skip duplicates.
     }
 
-    final updatedFavorites =
-        List<Map<String, String>>.from(state.favoriteDevices)..add(deviceData);
+    final updatedFavorites = List<Map<String, String>>.from(
+      state.favoriteDevices,
+    )..add(deviceData);
     await _prefs!.setString(_prefFavoriteDevices, jsonEncode(updatedFavorites));
     state = state.copyWith(favoriteDevices: updatedFavorites);
   }
@@ -241,14 +297,15 @@ class SettingsNotifier extends Notifier<SettingsState> {
       _logger.warning("Attempted to remove favorite without an IP address.");
       return;
     }
-    final updatedFavorites = List<Map<String, String>>.from(
-        state.favoriteDevices)
-      ..removeWhere(
-          (fav) => fav['ip'] == deviceData['ip']); // Match only IP for removal
+    final updatedFavorites =
+        List<Map<String, String>>.from(state.favoriteDevices)..removeWhere(
+          (fav) => fav['ip'] == deviceData['ip'],
+        ); // Match only IP for removal
     await _prefs!.setString(_prefFavoriteDevices, jsonEncode(updatedFavorites));
     state = state.copyWith(favoriteDevices: updatedFavorites);
     _logger.fine(
-        "Notifier state updated. New favorites list: ${state.favoriteDevices}");
+      "Notifier state updated. New favorites list: ${state.favoriteDevices}",
+    );
   }
 
   /// Sets the secondary color for buttons and accents
@@ -256,6 +313,52 @@ class SettingsNotifier extends Notifier<SettingsState> {
   Future<void> setSecondaryColor(int colorValue) async {
     await _prefs!.setInt(_prefSecondaryColor, colorValue);
     state = state.copyWith(secondaryColor: colorValue);
+  }
+
+  /// Enables or disables URL cleaner for send-text flow.
+  Future<void> setUrlCleanerEnabled(bool enabled) async {
+    await _prefs!.setBool(_prefUrlCleanerEnabled, enabled);
+    state = state.copyWith(urlCleanerEnabled: enabled);
+  }
+
+  /// Adds a URL cleaner keyword if it is non-empty and not already present.
+  Future<void> addUrlCleanerKeyword(String keyword) async {
+    final normalizedKeyword = keyword.trim();
+    if (normalizedKeyword.isEmpty) {
+      return;
+    }
+
+    final normalizedLower = normalizedKeyword.toLowerCase();
+    final alreadyExists = state.urlCleanerKeywords.any(
+      (existing) => existing.toLowerCase() == normalizedLower,
+    );
+    if (alreadyExists) {
+      return;
+    }
+
+    final updatedKeywords = List<String>.from(state.urlCleanerKeywords)
+      ..add(normalizedKeyword);
+    await _prefs!.setString(
+      _prefUrlCleanerKeywords,
+      jsonEncode(updatedKeywords),
+    );
+    state = state.copyWith(urlCleanerKeywords: updatedKeywords);
+  }
+
+  /// Removes a URL cleaner keyword using case-insensitive match.
+  Future<void> removeUrlCleanerKeyword(String keyword) async {
+    final normalizedKeyword = keyword.trim().toLowerCase();
+    if (normalizedKeyword.isEmpty) {
+      return;
+    }
+
+    final updatedKeywords = List<String>.from(state.urlCleanerKeywords)
+      ..removeWhere((existing) => existing.toLowerCase() == normalizedKeyword);
+    await _prefs!.setString(
+      _prefUrlCleanerKeywords,
+      jsonEncode(updatedKeywords),
+    );
+    state = state.copyWith(urlCleanerKeywords: updatedKeywords);
   }
 }
 
@@ -273,8 +376,9 @@ final settingsFutureProvider = FutureProvider<SettingsState>((ref) async {
 
 /// Main settings provider that maintains the current settings state
 /// Provides access to settings values and methods to modify them
-final settingsProvider =
-    NotifierProvider<SettingsNotifier, SettingsState>(SettingsNotifier.new);
+final settingsProvider = NotifierProvider<SettingsNotifier, SettingsState>(
+  SettingsNotifier.new,
+);
 
 /// Provides convenient access to just the device alias
 final deviceAliasProvider = Provider<String>((ref) {
@@ -311,4 +415,16 @@ final favoriteDevicesProvider = Provider<List<Map<String, String>>>((ref) {
   // Watch the StateNotifierProvider directly to get live updates
   final settingsState = ref.watch(settingsProvider);
   return settingsState.favoriteDevices;
+});
+
+/// Provides convenient access to URL cleaner enabled setting.
+final urlCleanerEnabledProvider = Provider<bool>((ref) {
+  final settingsState = ref.watch(settingsProvider);
+  return settingsState.urlCleanerEnabled;
+});
+
+/// Provides convenient access to URL cleaner keyword list.
+final urlCleanerKeywordsProvider = Provider<List<String>>((ref) {
+  final settingsState = ref.watch(settingsProvider);
+  return settingsState.urlCleanerKeywords;
 });

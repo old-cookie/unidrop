@@ -35,21 +35,25 @@ class SettingsPage extends ConsumerWidget {
       child: SegmentedButton<String>(
         segments: const [
           ButtonSegment(
-              value: "dark",
-              label: Text("Dark"),
-              icon: Icon(Icons.brightness_4_rounded)),
+            value: "dark",
+            label: Text("Dark"),
+            icon: Icon(Icons.brightness_4_rounded),
+          ),
           ButtonSegment(
-              value: "oled",
-              label: Text("OLED"),
-              icon: Icon(Icons.dark_mode_rounded)),
+            value: "oled",
+            label: Text("OLED"),
+            icon: Icon(Icons.dark_mode_rounded),
+          ),
           ButtonSegment(
-              value: "system",
-              label: Text("System"),
-              icon: Icon(Icons.brightness_auto_rounded)),
+            value: "system",
+            label: Text("System"),
+            icon: Icon(Icons.brightness_auto_rounded),
+          ),
           ButtonSegment(
-              value: "light",
-              label: Text("Light"),
-              icon: Icon(Icons.brightness_high_rounded)),
+            value: "light",
+            label: Text("Light"),
+            icon: Icon(Icons.brightness_high_rounded),
+          ),
         ],
         selected: {currentBrightnessString}, // Use the converted string
         onSelectionChanged: (Set<String> newSelection) async {
@@ -70,7 +74,10 @@ class SettingsPage extends ConsumerWidget {
   /// [currentColor] - Currently selected color value
   /// Returns a Row of color selector buttons
   Widget _buildColorSelector(
-      BuildContext context, WidgetRef ref, int currentColor) {
+    BuildContext context,
+    WidgetRef ref,
+    int currentColor,
+  ) {
     // Define 5 color options with names
     final List<(int, String)> colorOptions = const [
       (0xFF2196F3, 'Blue'),
@@ -133,18 +140,23 @@ class SettingsPage extends ConsumerWidget {
   /// [ref] - WidgetRef for state management
   /// [currentAlias] - Current device alias to show in the dialog
   Future<void> _showEditAliasDialog(
-      BuildContext context, WidgetRef ref, String currentAlias) async {
-    final TextEditingController controller =
-        TextEditingController(text: currentAlias);
+    BuildContext context,
+    WidgetRef ref,
+    String currentAlias,
+  ) async {
+    final TextEditingController controller = TextEditingController(
+      text: currentAlias,
+    );
     return showDialog<void>(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Edit Device Alias'),
           content: TextField(
-              controller: controller,
-              autofocus: true,
-              decoration: const InputDecoration(hintText: 'Enter new alias')),
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(hintText: 'Enter new alias'),
+          ),
           actions: <Widget>[
             TextButton(
               child: const Text('Cancel'),
@@ -162,7 +174,9 @@ class SettingsPage extends ConsumerWidget {
                   if (context.mounted) {
                     Navigator.of(context).pop();
                     showCopyableSnackBar(
-                        context, 'Alias updated successfully!');
+                      context,
+                      'Alias updated successfully!',
+                    );
                   }
                 } else {
                   showCopyableSnackBar(context, 'Alias cannot be empty.');
@@ -179,17 +193,22 @@ class SettingsPage extends ConsumerWidget {
   /// [context] - BuildContext for showing feedback
   /// [ref] - WidgetRef for state management
   Future<void> _pickDestinationDirectory(
-      BuildContext context, WidgetRef ref) async {
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
     try {
-      String? selectedDirectory = await FilePicker.platform
-          .getDirectoryPath(dialogTitle: 'Select Destination Directory');
+      String? selectedDirectory = await FilePicker.platform.getDirectoryPath(
+        dialogTitle: 'Select Destination Directory',
+      );
       if (selectedDirectory != null) {
         await ref
             .read(settingsProvider.notifier)
             .setDestinationDirectory(selectedDirectory);
         if (context.mounted) {
           showCopyableSnackBar(
-              context, 'Destination directory set to: $selectedDirectory');
+            context,
+            'Destination directory set to: $selectedDirectory',
+          );
         }
       } else {
         if (context.mounted) {
@@ -204,6 +223,116 @@ class SettingsPage extends ConsumerWidget {
     }
   }
 
+  Future<void> _showAddUrlCleanerKeywordDialog(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final controller = TextEditingController();
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Add URL Cleaner Keyword'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(hintText: 'Example: ?si'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final keyword = controller.text.trim();
+                if (keyword.isEmpty) {
+                  if (dialogContext.mounted) {
+                    showCopyableSnackBar(
+                      dialogContext,
+                      'Keyword cannot be empty.',
+                    );
+                  }
+                  return;
+                }
+
+                final existingKeywords = ref.read(urlCleanerKeywordsProvider);
+                final alreadyExists = existingKeywords.any(
+                  (existing) => existing.toLowerCase() == keyword.toLowerCase(),
+                );
+                if (alreadyExists) {
+                  if (dialogContext.mounted) {
+                    showCopyableSnackBar(
+                      dialogContext,
+                      'Keyword already exists.',
+                    );
+                  }
+                  return;
+                }
+
+                await ref
+                    .read(settingsProvider.notifier)
+                    .addUrlCleanerKeyword(keyword);
+                if (dialogContext.mounted) {
+                  Navigator.of(dialogContext).pop();
+                }
+                if (context.mounted) {
+                  showCopyableSnackBar(context, 'Keyword added successfully!');
+                }
+              },
+              child: const Text('Add'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildUrlCleanerKeywordSection(
+    BuildContext context,
+    WidgetRef ref,
+    List<String> keywords,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Cleaner runs when sending text and only modifies URL parts.',
+        ),
+        const SizedBox(height: 8),
+        if (keywords.isEmpty)
+          const Text('No keywords yet. Add one to start cleaning URLs.'),
+        if (keywords.isNotEmpty)
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: keywords
+                .map(
+                  (keyword) => InputChip(
+                    label: Text(keyword),
+                    onDeleted: () {
+                      ref
+                          .read(settingsProvider.notifier)
+                          .removeUrlCleanerKeyword(keyword);
+                    },
+                  ),
+                )
+                .toList(),
+          ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: () {
+            _showAddUrlCleanerKeywordDialog(context, ref);
+          },
+          icon: const Icon(Icons.add),
+          label: const Text('Add Keyword'),
+        ),
+      ],
+    );
+  }
+
   /// Builds the settings page UI with all available options
   /// [context] - BuildContext for the widget
   /// [ref] - WidgetRef for accessing app state
@@ -211,10 +340,15 @@ class SettingsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final String currentAlias = ref.watch(deviceAliasProvider);
-    final String? currentDestinationDir =
-        ref.watch(destinationDirectoryProvider);
+    final String? currentDestinationDir = ref.watch(
+      destinationDirectoryProvider,
+    );
     final bool useBiometricAuth = ref.watch(biometricAuthProvider);
     final int secondaryColor = ref.watch(secondaryColorProvider);
+    final bool urlCleanerEnabled = ref.watch(urlCleanerEnabledProvider);
+    final List<String> urlCleanerKeywords = ref.watch(
+      urlCleanerKeywordsProvider,
+    );
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
@@ -233,7 +367,8 @@ class SettingsPage extends ConsumerWidget {
             leading: const Icon(Icons.folder_open_outlined),
             title: const Text('Destination Directory'),
             subtitle: Text(
-                currentDestinationDir ?? 'Not set (Defaults to Downloads)'),
+              currentDestinationDir ?? 'Not set (Defaults to Downloads)',
+            ),
             onTap: () {
               _pickDestinationDirectory(context, ref);
             },
@@ -243,8 +378,9 @@ class SettingsPage extends ConsumerWidget {
             SwitchListTile(
               secondary: const Icon(Icons.fingerprint),
               title: const Text('Use Biometric Authentication'),
-              subtitle:
-                  const Text('Require fingerprint/face ID to open the app'),
+              subtitle: const Text(
+                'Require fingerprint/face ID to open the app',
+              ),
               value: useBiometricAuth,
               onChanged: (bool value) {
                 // Use the main settingsProvider notifier
@@ -259,7 +395,9 @@ class SettingsPage extends ConsumerWidget {
             subtitle: Padding(
               padding: const EdgeInsets.only(top: 8.0),
               child: _buildBrightnessSegmentedButton(
-                  context, ref), // Remove FutureBuilder
+                context,
+                ref,
+              ), // Remove FutureBuilder
             ),
           ),
           const Divider(),
@@ -269,6 +407,30 @@ class SettingsPage extends ConsumerWidget {
             subtitle: Padding(
               padding: const EdgeInsets.only(top: 8.0),
               child: _buildColorSelector(context, ref, secondaryColor),
+            ),
+          ),
+          const Divider(),
+          SwitchListTile(
+            secondary: const Icon(Icons.cleaning_services_outlined),
+            title: const Text('Enable URL Cleaner'),
+            subtitle: const Text(
+              'When enabled, URL keywords are removed before sending text.',
+            ),
+            value: urlCleanerEnabled,
+            onChanged: (bool value) {
+              ref.read(settingsProvider.notifier).setUrlCleanerEnabled(value);
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.link_outlined),
+            title: const Text('URL Cleaner Keywords'),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: _buildUrlCleanerKeywordSection(
+                context,
+                ref,
+                urlCleanerKeywords,
+              ),
             ),
           ),
           const Divider(),
