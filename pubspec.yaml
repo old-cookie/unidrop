@@ -1,7 +1,7 @@
 name: unidrop
 description: UFCFS4-30-3 Creative Technologies Project.
 publish_to: "none"
-version: 4.0.4
+version: 4.1.0
 
 environment:
   sdk: ">=3.11.0"
@@ -34,7 +34,7 @@ dependencies:
   archive: ^4.0.9
 
   # Device and security
-  device_info_plus: ^12.3.0
+  device_info_plus: 12.3.0
   shared_preferences: ^2.5.4
   encrypt_shared_preferences: ^1.0.1
   local_auth: ^3.0.1
